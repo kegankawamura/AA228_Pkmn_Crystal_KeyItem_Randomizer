@@ -1,4 +1,4 @@
 [submodule "pokemon-crystal-randomizer-tracker"]
 	path = pokemon-crystal-randomizer-tracker
-	url = https://github.com/vicendithas/pokemon-crystal-randomizer-tracker.git
+  url = git@github.com:aacwong/pokemon-crystal-randomizer-tracker.git
 	branch = master
