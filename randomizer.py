@@ -8,6 +8,7 @@ from enum import Enum,auto
 import random
 import pdb
 import netgraph
+import copy
 
 class AutoName(Enum):
     def _generate_next_value_(name, start, count, last_values):
@@ -328,7 +329,7 @@ def progress_rules(helditems,logic):
     saffron = lambda : logicset.issuperset({Item.PASS}) or\
                        logicset.issuperset({Item.SQUIRTBOTTLE,Item.SSTICKET})
     snorlax = lambda : saffron() and logicset.issuperset({Item.POKEGEAR,Item.RADIOCARD,Item.EXPANSIONCARD})
-    if snorlax(): logicset.add(Rule.SNORLAX)
+    if snorlax(): rules.append(Rule.SNORLAX); logicset.add(Rule.SNORLAX)
     viridian = lambda : logicset.issuperset({Rule.SNORLAX,Rule.CANUSECUT}) or\
                        logicset.issuperset({Rule.CANUSESURF,Rule.CANUSEWATERFALL,Rule.HAVEEIGHTBADGES})
 
@@ -365,6 +366,13 @@ def progress_rules(helditems,logic):
 
     return rules
 
+def in_logic(helditems):
+    logic_r = logical_rules(helditems)
+    progress_r = progress_rules(helditems,logic_r)
+    logic = set( (*helditems,*logic_r,*progress_r) ) # things 'inlogic'
+    return logic
+
+
 def is_reachable(place,set_access):
     if len(place.rules)==0: return True;
     for r in place.rules:
@@ -381,12 +389,9 @@ def get_missing_rules(place,set_access):
     return missing
 
 def accessible_checks(locations, helditems):
-    logic_r = logical_rules(helditems)
-    progress_r = progress_rules(helditems,logic_r)
+    logic = in_logic(helditems)
     acc_checks = []
     set_blocks = set()
-    
-    logic = set( (*helditems,*logic_r,*progress_r) ) # things 'inlogic'
 
     
     for loc in locations:
@@ -401,6 +406,7 @@ def accessible_checks(locations, helditems):
                         if sum(isinstance(x,ImpTown) for x in block):
                             pass
                         elif len(block)>=1: 
+                            if Rule.SNORLAX in block and Rule.SNORLAX in logic: pdb.set_trace()
                             set_blocks = set_blocks.union(block)
         else:
             blocks = get_missing_rules(loc,logic)
@@ -446,6 +452,13 @@ def get_items_from_rule(rule):
         if rule == ImpTown.SAFFRON:
             items = {Item.PASS,Item.SQUIRTBOTTLE,Item.SSTICKET}
             return items;
+        if rule == ImpTown.VIRIDIAN:
+            items = get_items_from_rule(Rule.SNORLAX).union(
+                    get_items_from_rule(Rule.CANUSECUT)).union(
+                    get_items_from_rule(Rule.CANUSESURF)).union(
+                    get_items_from_rule(Rule.CANUSEWATERFALL)).union(
+                    get_items_from_rule(Rule.HAVEEIGHTBADGES))
+            return items;
         if rule == Rule.SNORLAX:
             items = items.union({Item.POKEGEAR,Item.RADIOCARD,Item.EXPANSIONCARD}).union({Item.PASS,Item.SQUIRTBOTTLE,Item.SSTICKET})
             return items
@@ -468,6 +481,10 @@ def get_items_from_rule(rule):
                     get_items_from_rule(Rule.CANUSESURF)).union(
                     get_items_from_rule(Rule.CANUSESTRENGTH))
             return items
+        if rule == Rule.TALKBLUE:
+            items = get_items_from_rule(ImpTown.VIRIDIAN).union(
+                    get_items_from_rule(Rule.CANUSESURF))
+            return items
 
         pdb.set_trace()
     return items
@@ -479,7 +496,7 @@ def read_json():
     for filepath in sorted(os.scandir(locations_path),key=lambda fp: fp.name):
         if (not filepath.name.endswith(".json") or filepath.name.find('virtual')>=0):
             continue;
-        print(filepath.path)
+        #print(filepath.path)
         file = open(filepath.path)
         js = json.load(file)
         
@@ -515,7 +532,6 @@ def read_json():
             if 'battles' in js[0].keys():
                 loc.battles = Battle.battle_from_list(js[0]['battles']);
             if 'fly_point' in js[0].keys():
-                print(js[0])
                 loc.fly_point = True;
             if 'steps_to' in js[0].keys():
                 loc.steps_to = js[0]['steps_to']
@@ -552,15 +568,20 @@ def read_json():
     #       repeat until graph is complete (all checks are available)
     #       fill in rest of items
     
-def randomize(locations):
+def randomize(locations,verbose=False):
     item_pool = set(Item).union(set(Hm)).union(set(Badge))
     items_accessible = []
     prev_acc_checks = []
     
     count = 0;
+    #cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or set(Item.PASS,Item.SSTICKET).issubset(set(items_accessible))
+    cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.PASS in items_accessible
+    cangetoutofSF = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.SSTICKET in items_accessible
     
     blocked = True
     while len(item_pool)>0:
+        try_count = 0;
+
         if blocked:
             acc_checks, blocks = accessible_checks(locations,items_accessible)
             if len(blocks)==0:
@@ -570,6 +591,14 @@ def randomize(locations):
         if count==0: # first item is bicycle to ensure early bike
             prev_acc_checks = acc_checks
             rand_item = Item.BICYCLE
+        elif  count == 12 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
+            rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
+            #pdb.set_trace()
+        elif count == 15 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
+            rand_item = random.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
+        elif count > 19 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
+            if Hm.SURF not in items_accessible: rand_item = Hm.SURF
+            elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
             # get random blocking item that hasnt been placed yet 
             rand_block = random.choice(list(blocks))
@@ -581,8 +610,9 @@ def randomize(locations):
                 possible_items = get_items_from_rule(rand_block)
                 rand_item = random.choice(list(possible_items))
                 try_count+=1
-                if try_count ==200:
-                    prin(f'having trouble with {blocks} given these items: {items_accessible}')
+                if try_count >=200:
+                    print(f'having trouble with {blocks} given these items: {items_accessible}')
+                    pdb.set_trace()
 
     
         # get random check that isnt filled already
@@ -592,11 +622,17 @@ def randomize(locations):
             rand_check = random.choice(weighted_checks)
             if len(rand_check.item)<rand_check.item_count:
                 break;
+            try_count+=1
+            if try_count >=200:
+                print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
+                pdb.set_trace()
+                randomize(locations,verbose)
         # place item in check, and update sets of items
         rand_check.item.append(rand_item)
         items_accessible.append(rand_item)
         item_pool.remove(rand_item)
-        print(f'putting {rand_item.name} at check {rand_check}')
+        if verbose:
+            print(f'putting {rand_item.name} at check {rand_check}')
         count +=1
         prev_acc_checks = acc_checks
 
@@ -610,7 +646,8 @@ def randomize(locations):
             rand_check.item.append(rand_item)
             items_accessible.append(rand_item)
             item_pool.remove(rand_item)
-            print(f'putting {rand_item.name} at check {rand_check}')
+            if verbose:
+                print(f'putting {rand_item.name} at check {rand_check}')
     
     count_trash = 0
     for ck in [ck for l in locations for ck in l.checks]:
@@ -619,14 +656,20 @@ def randomize(locations):
             count_trash +=1
     return locations
 
-def run():
-    locations = read_json()
-    randomize(locations)
-    
-    rando = Game(locations)
+def run(count=1,verbose=False):
+    randos = []
+    locs = read_json()
+    for i in range(count):
+        locations = copy.deepcopy(locs)
+        randomize(locations,verbose)
+        rando = Game(locations)
+        if count==1: return rando
+        randos.append(rando)
     #rando.plot()
-    return rando
+    return randos
 
 if __name__=='__main__':
     rando = run()
-    rando.plot()
+    #rando.plot()
+    randos = run(1000)
+    #randos = [run() for i in range(1000)]
