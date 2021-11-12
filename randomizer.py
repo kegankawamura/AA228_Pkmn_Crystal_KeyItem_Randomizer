@@ -158,48 +158,10 @@ class Game:
         self.graph = networkx.Graph();
         for l in locations:
             self.graph.add_node(l.name,location=l)
-        self.graph.add_edge('New Bark Town','Route 30')
-        self.graph.add_edge('Route 30','Violet City')
-        self.graph.add_edge('Violet City','Route 32')
-        self.graph.add_edge('Violet City','Sprout Tower')
-        self.graph.add_edge('Route 32','Azalea Town')
-        self.graph.add_edge('Azalea Town','Ilex Forest')
-        self.graph.add_edge('Azalea Town','Slowpoke Well')
-        self.graph.add_edge('Ilex Forest','Goldenrod City')
-        self.graph.add_edge('Goldenrod City','Ecruteak City')
-        self.graph.add_edge('Goldenrod City','Goldenrod Underground')
-        self.graph.add_edge('Goldenrod City','Goldenrod Radio Tower')
-        self.graph.add_edge('Violet City','Ecruteak City')
-        self.graph.add_edge('Ecruteak City','Olivine City')
-        self.graph.add_edge('Ecruteak City','Mahogany Town')
-        self.graph.add_edge('Ecruteak City','Tin Tower')
-        self.graph.add_edge('Olivine City','Cianwood City')
-        self.graph.add_edge('Olivine City','Olivine Lighthouse')
-        self.graph.add_edge('Mahogany Town','Ice Path')
-        self.graph.add_edge('Ice Path','Blackthorn City')
-        self.graph.add_edge('Mahogany Town','Lake of Rage')
-        self.graph.add_edge('Blackthorn City','New Bark Town')
-        self.graph
-        self.graph.add_edge('New Bark Town','Indigo Plateau')
-        self.graph.add_edge('Indigo Plateau','Mt. Silver')
-        self.graph.add_edge('Indigo Plateau','Viridian City')
-        self.graph.add_edge('Viridian City','Pewter City')
-        self.graph.add_edge('Viridian City','Pallet Town')
-        self.graph.add_edge('Pallet Town','Cinnabar Island')
-        self.graph.add_edge('Cinnabar Island','Seafoam Islands')
-        self.graph.add_edge('Pewter City','Cerulean City')
-        self.graph.add_edge('Cerulean City','Power Plant')
-        self.graph.add_edge('Cerulean City','Route 25')
-        self.graph.add_edge('Cerulean City','Saffron City')
-        self.graph.add_edge('Saffron City','Lavender Town')
-        self.graph.add_edge('Saffron City','Celadon City')
-        self.graph.add_edge('Saffron City','Vermilion City')
-        self.graph.add_edge('Vermilion City','Route 12')
-        self.graph.add_edge('Vermilion City','Pewter City')
-        self.graph.add_edge('Power Plant','Lavender Town')
-        self.graph.add_edge('Lavender Town','Route 12')
-        self.graph.add_edge('Route 12','Fuschia City')
-        self.graph.add_edge('Celadon City','Fuschia City')
+        for l in locations:
+            for (loc,steps) in l.steps_to.items():
+                self.graph.add_edge(l.name,loc,steps=steps)
+        
     def plot(self):
         locations = self.locations
         coords = dict(zip([l.name for l in locations],[l.coord for l in locations]))
@@ -553,6 +515,8 @@ def read_json():
             loc.coord = (coord['x'],-coord['y'])
             if 'battles' in js[0].keys():
                 loc.battles = Battle.battle_from_list(js[0]['battles']);
+            if 'steps_to' in js[0].keys():
+                loc.steps_to = js[0]['steps_to']
             if 'access_rules' in js[0].keys():
                 loc.rules = convert_rule(js[0]['access_rules'])
             for check in js[0]['sections']:
