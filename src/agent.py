@@ -1,7 +1,6 @@
 import numpy as np
-
-
-NumKeys = 32 # make this a static global variable
+import constants
+import decision_making
 
 Class agent():
 
@@ -9,7 +8,7 @@ Class agent():
 		self.curr_node = _start_node
 		self.lvl = 5
 		self.exp = 0
-		self.keyItems = [0]*NumKeys #number of key items
+		self.keyItems = [0]*NUMKEYS #number of key items
 		# include policy as input if we use offline planning?
 
 	def getLevel(self):

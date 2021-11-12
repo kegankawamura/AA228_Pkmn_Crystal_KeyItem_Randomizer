@@ -1,5 +1,6 @@
 import NetWorkX as nx
 import random
+import constants
 
 def createMap(inputFile):
 
