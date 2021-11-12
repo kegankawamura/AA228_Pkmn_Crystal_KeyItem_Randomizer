@@ -205,15 +205,15 @@ Itemfinder - Ecruteak House
 
 Old Rod - Route 32 Fisher
 
-  * Catch low level pokemon
+  * Catch low level pokemon (useless)
 
 Good Rod - Olivine Fisher
 
-  * Catch medium level pokes
+  * Catch medium level pokes (useless)
 
 Super Rod - Route 12 Fisher
 
-  * Catch high level pokes
+  * Catch high level pokes (useless)
 
 
 
@@ -265,7 +265,7 @@ Zephyr, Hive, Plain, Fog, Storm, Mineral, Glacier, Rising
 
 Kanto Badges in order
 
-Boulder, Cascade, Thunder, Rainbow, Sould, Marsh, Volcano, Earth
+Boulder, Cascade, Thunder, Rainbow, Soul, Marsh, Volcano, Earth
 
 #### Row 7:
 

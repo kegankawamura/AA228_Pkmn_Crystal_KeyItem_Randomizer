@@ -97,6 +97,7 @@ class Location:
         self.visited = False;
         self.battles = [];
         self.steps_to = {};
+        self.fly_point = False;
 
     def is_accessible(self,items):
         return
@@ -147,7 +148,6 @@ class Battle:
             battles.append(battle)
         return battles
 
-
 class Player:
     def __init__():
         self.level = 5;
@@ -161,7 +161,6 @@ class Game:
         for l in locations:
             for (loc,steps) in l.steps_to.items():
                 self.graph.add_edge(l.name,loc,steps=steps)
-        
     def plot(self):
         locations = self.locations
         coords = dict(zip([l.name for l in locations],[l.coord for l in locations]))
@@ -515,6 +514,9 @@ def read_json():
             loc.coord = (coord['x'],-coord['y'])
             if 'battles' in js[0].keys():
                 loc.battles = Battle.battle_from_list(js[0]['battles']);
+            if 'fly_point' in js[0].keys():
+                print(js[0])
+                loc.fly_point = True;
             if 'steps_to' in js[0].keys():
                 loc.steps_to = js[0]['steps_to']
             if 'access_rules' in js[0].keys():
