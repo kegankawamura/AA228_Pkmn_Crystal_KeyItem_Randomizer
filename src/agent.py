@@ -1,46 +1,59 @@
 import numpy as np
 import constants
-import decision_making
+import decision_making as dm
 
-Class agent():
+'''
+Class that represents our agent (Crystal) exploring the pokemon crystal map.
+'''
+Class Agent:
 
-	def __init__(self, _start_node):
-		self.curr_node = _start_node
-		self.lvl = 5
-		self.exp = 0
-		self.keyItems = [0]*NUMKEYS #number of key items
+	def __init__(self, start_node):
+		self._curr_node = start_node
+		self._lvl = 5
+		self._exp = 0
+		self._keyItems = {} #number of key items
+		for check in constants.keyItems:
+			self._keyItems[check] = 0
 		# include policy as input if we use offline planning?
 
-	def getLevel(self):
-		return self.lvl
+	@property
+	def level(self):
+		return self._lvl
 
 	def getCurrNode(self):
-		return self.curr_node
+		return self._curr_node
 
 	def setCurrNode(self, node, crystalMap):
 		if crystalMap.has_node(node):
-			self.curr_node = node
+			self._curr_node = node
 
 	def getKeyItems(self):
-		return self.getKeyItems
+		return self._keyItems.copy()
 
-	def addKeyItem(self, keyItemIdx):
-		if keyItemIdx < 0 or keyItemIdx >=	NumKeys
+	def addKeyItem(self, keyItemEnum):
+		if self._keyItems.has_key(keyItemEnum):
+			self._keyItems[keyItemEnum] = 1
+		else:
+			println("Key Item not found")
 
 	def chooseAction(self, crystalMap):
 		pass
 		#nextNodes = crystalMap.neighbors(crystal.getCurrNode())
 		# use current state and networkx graph to decide on next action
 
-	# exp to level function
-	def totalExp(level):
-		return level**3
+
+	def update(self, nextNode, currNode, r):
+		pass
 
 	def addExp(self, new_exp):
 		if lvl >= 100:
 			return
-		self.exp += new_exp
+		self._exp += new_exp
 		lvlUp_exp = self.totalExp(lvl+1) - self.totalExp(lvl)
-		if self.exp >= lvlUp_exp:
-			self.lvl += 1
-			self.exp %= lvlUp_exp
+		if self._exp >= lvlUp_exp:
+			self._lvl += 1
+			self._exp %= lvlUp_exp
+
+	# exp to level function
+	def totalExp(level):
+		return level**3

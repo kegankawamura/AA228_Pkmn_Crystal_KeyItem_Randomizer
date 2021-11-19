@@ -4,10 +4,10 @@ import constants
 import agent
 
 
-def currentState(agent):
-	level = agent.getLevel()
-	currNode = agent.getCurrNode()
-	keyItems = agent.getKeyItems()
+def currentState(_agent):
+	level = _agent.level
+	currNode = _agent.getCurrNode()
+	keyItems = _agent.getKeyItems()
 
 	state = level
 	state += 100*currNode
@@ -24,9 +24,9 @@ def decodeState(state):
 	level = ((state - 1) % 100) + 1
 	currNode = (state - level)/100
 
-	keyItems = [0]*NumKeys
+	keyItems = [0]*constants.NUMKEYS
 	mask = 1
-	for i in range(NumKeys):
+	for i in range(constants.NUMKEYS):
 		keyItems[i] = keyState & mask
 		mask *= 2
 

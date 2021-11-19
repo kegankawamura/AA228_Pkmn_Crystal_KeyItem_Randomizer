@@ -3,7 +3,9 @@ import createMap
 import agent
 import random
 
-
+'''
+Simulation of pokemon crystal.
+'''
 def run(mapConfigFile):
 	crystalMap, startNode, goalNode = createMap.createMap(mapConfigFile)
 	crystal = agent.Agent(startNode)
@@ -11,46 +13,42 @@ def run(mapConfigFile):
 	history = [startNode] # state action pairs?
 	while crystal.getCurrNode() != goalNode:
 		# simulate game
+		currNode = crystal.getCurrNode()
 		nextNode = crystal.chooseAction(crystalMap)
-		turn = crystalMap[crystal.getCurrNode()][nextNode]["weight"]
+		turn = transitionCost(currNode, nextNode, crystalMap)
+		reward = -turn
 		turns += turn
 		crystal.setCurrNode(nextNode)
 		history.push(nextNode)
-		nextNode.doEvent(crystal)
+		check = nextNode.doEvent(crystal)
+		if check:
+			crystal.addKeyItem(check.name)
+			reward += check.reward
+		crystal.update(nextNode, currNode, reward)
 		# state is updated
 	return turns, history
 
-def calculateExp(opponent):
-	a = 1
-	L = opponent.getLevel()
-	b = 3
-	C = 2	# artificial scale factor
-	if isinstance(opponent, Trainer):
-		a = 1.5
-		C = 6
 
-	return round(C*a*b*L/7)
-
-def battle(trainer, bot):
-	agentLvl = trainer.getLevel()
-	botLvl = bot.getLevel()
-
-	agentExp = Agent.totalExp(agentLvl)
-	botExp = Agent.totalExp(botLvl)
-
-	agentAdvantage = agentExp/(agentExp + botExp)
-
-	if random.random() < agentAdvantage:
-		bot.setDefeat(True)
-		trainer.addExp(calculateExp(bot))
-		return True
+'''
+Given current node and next node, compute the cost to transition
+'''
+def transitionCost(currNode, nextNode, crystalMap):
+	if currNode == nextNode:
+		return nextNode.revisitCost
 	else:
-		return False
+		return crystalMap[currNode][nextNode]["weight"]
 
 
+'''
+Main
+'''
 if __name__ == '__main__':
 	if len(sys.argv) != 2:
         raise Exception("usage: python simulate.py <infile>.txt")
 
     inputfilename = sys.argv[1]
 	numTurns, history = run(inputfilename)
+	with open('pkmnHistoryData.txt') as f:
+		f.write(f"{numTurns}\n")
+		for state_action in history:
+			f.write(f"{state_action}\n")
