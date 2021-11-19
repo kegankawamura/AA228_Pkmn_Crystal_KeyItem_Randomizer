@@ -672,4 +672,3 @@ if __name__=='__main__':
     rando = run()
     #rando.plot()
     randos = run(1000)
-    #randos = [run() for i in range(1000)]
