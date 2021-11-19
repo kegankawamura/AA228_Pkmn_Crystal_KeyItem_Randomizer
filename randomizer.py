@@ -136,7 +136,25 @@ class Battle:
     def __init__(self):
         # list of pokemon (levels)
         self.pokemon = [];
-        self.Won = False;
+        self.beat = False;
+
+    def calculate_exp(self):
+        a = 1.5; b = 3; c = 2;
+        return numpy.cumsum([a*b*c*poke for poke in self.pokemon])
+    # returns true if player beats this battle, and gives the player experience
+    # returns false if player loses
+    def battle(self,player):
+        q = 20;
+        l = player.level;
+        for poke in self.pokemon:
+            adv = (q*l/(poke + q*l))**3 # squiggly line
+            if numpy.random.random_sample()>adv:
+                # lose against poke
+                return false;
+        player.gain_exp(self.calculate_exp());
+        self.beat = True;
+        return True;
+
     def __str__(self):
         return str(self.pokemon);
     def __repr__(self):
@@ -149,9 +167,25 @@ class Battle:
             battles.append(battle)
         return battles
 
+
 class Player:
     def __init__():
         self.level = 5;
+        self.exp = 0;
+        self.location = "";
+        self.key_items = [];
+        self.completed_checks = [];
+
+    def gain_exp(self,exp):
+        if self.level>=100: return
+        self.exp += exp;
+        lvl_up_exp = level_exp(self.level+1)-level_exp(self.level)
+        if self.exp >= lvl_up_exp:
+            self.level+=1
+            self.exp %= lvl_up_exp
+        return
+    def level_exp(level):
+        return level**3;
 
 class Game:
     def __init__(self,locations):
@@ -162,6 +196,17 @@ class Game:
         for l in locations:
             for (loc,steps) in l.steps_to.items():
                 self.graph.add_edge(l.name,loc,steps=steps)
+        self.player = Player();
+        return
+
+    # get possible checks for the player that have not been visited 
+    # realize this is not so useful since checks dont have obvious
+    # correspondence to locations
+    def get_next_checks(self):
+        items = self.player.key_items
+        return accessible_checks(self.locations,items)
+
+
     def plot(self):
         locations = self.locations
         coords = dict(zip([l.name for l in locations],[l.coord for l in locations]))
@@ -372,7 +417,6 @@ def in_logic(helditems):
     logic = set( (*helditems,*logic_r,*progress_r) ) # things 'inlogic'
     return logic
 
-
 def is_reachable(place,set_access):
     if len(place.rules)==0: return True;
     for r in place.rules:
@@ -397,7 +441,7 @@ def accessible_checks(locations, helditems):
     for loc in locations:
         if is_reachable(loc,logic):
             for chk in loc.checks:
-                if is_reachable(chk,logic):
+                if is_reachable(chk,logic) and not chk.revealed:
                     acc_checks.append(chk)
                 else:
                     blocks = get_missing_rules(chk,logic)
