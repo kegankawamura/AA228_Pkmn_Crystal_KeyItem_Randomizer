@@ -10,6 +10,8 @@ import pdb
 import netgraph
 import copy
 
+import game
+
 class AutoName(Enum):
     def _generate_next_value_(name, start, count, last_values):
         return name
@@ -61,6 +63,7 @@ class Hm(Enum):
 
 class Rule(AutoName):
     CANUSECUT           = auto()
+    CANUSEFLY           = auto()
     CANUSESURF          = auto()
     CANUSEWHIRLPOOL     = auto()
     CANUSESTRENGTH      = auto() 
@@ -69,19 +72,20 @@ class Rule(AutoName):
     CANFIGHTTEAMROCKET  = auto()
     HAVEEIGHTBADGES     = auto()
     POWERPLANTMANAGER   = auto()
-    #TALKMISTY           = auto()
     TALKJASMINE         = auto()
     TALKBLUE            = auto()
+    TALKMISTY           = auto()
     CHUCK               = auto()
     SNORLAX             = auto()
     ROCKETWELL          = auto()
     FIXPOWERPLANT       = auto()
     REDGYARADOS         = auto()
-    ELECTRODE           = auto()
+    ELECTRODE           = auto() 
     OAK                 = auto()
     ELITEFOUR           = auto()
     RETURNPOTION        = auto()
     HAVEALLBADGES       = auto()
+    BEATRED             = auto()
 
 class ImpTown(Enum):
     SAFFRON     = 'Saffron City'
@@ -100,8 +104,9 @@ class Location:
         self.steps_to = {};
         self.fly_point = False;
 
-    def is_accessible(self,items):
-        return
+    def unrevealed_checks(self):
+        return [chk for chk in self.checks if not chk.revealed]
+
     def __str__(self):
         return self.name ;
     def __repr__(self): return 'l: '+self.__str__()
@@ -121,12 +126,33 @@ class Route:
 class Check:
     def __init__(self):
         self.action = '';
+        self.location = '';
         self.rules = [];
-        self.steps = [];
+        self.steps = 0;
         self.battles = [];
         self.item_count = 0;
         self.item = [];
         self.revealed = False;
+    # returns item (None if fail) and time cost
+    def attempt(self,player):
+        cost = self.cost(player);
+        if(len(self.battles)):
+            for battle in self.battles:
+                # if already beaten trainer
+                if battle.beat: continue;
+                # if fail battle
+                if not battle.battle(player):
+                    return (None,cost)
+        # success
+        self.revealed = True;
+        for item in self.item:
+            player.get_item(item)
+        player.completed_checks.append(self)
+        return (self.item,cost)
+    # sum of cost to go (steps) and battle time
+    def cost(self,player):
+        return self.steps/player.speed() + sum([b.cost() for b in self.battles]);
+
     def __str__(self):
         return self.action;
     def __repr__(self):
@@ -139,8 +165,8 @@ class Battle:
         self.beat = False;
 
     def calculate_exp(self):
-        a = 1.5; b = 3; c = 2;
-        return numpy.cumsum([a*b*c*poke for poke in self.pokemon])
+        a = 1.5; b = 3; c = 2.5;
+        return numpy.sum([a*b*c*poke for poke in self.pokemon])
     # returns true if player beats this battle, and gives the player experience
     # returns false if player loses
     def battle(self,player):
@@ -150,10 +176,16 @@ class Battle:
             adv = (q*l/(poke + q*l))**3 # squiggly line
             if numpy.random.random_sample()>adv:
                 # lose against poke
-                return false;
+                return False;
+        import pdb; pdb.set_trace;
         player.gain_exp(self.calculate_exp());
         self.beat = True;
         return True;
+    # cost is assumed to be 20 sec per pokemon
+    def cost(self):
+        return 20*len(self.pokemon)
+
+
 
     def __str__(self):
         return str(self.pokemon);
@@ -166,65 +198,6 @@ class Battle:
             battle.pokemon = b;
             battles.append(battle)
         return battles
-
-
-class Player:
-    def __init__():
-        self.level = 5;
-        self.exp = 0;
-        self.location = "";
-        self.key_items = [];
-        self.completed_checks = [];
-
-    def gain_exp(self,exp):
-        if self.level>=100: return
-        self.exp += exp;
-        lvl_up_exp = level_exp(self.level+1)-level_exp(self.level)
-        if self.exp >= lvl_up_exp:
-            self.level+=1
-            self.exp %= lvl_up_exp
-        return
-    def level_exp(level):
-        return level**3;
-
-class Game:
-    def __init__(self,locations):
-        self.locations = locations;
-        self.graph = networkx.Graph();
-        for l in locations:
-            self.graph.add_node(l.name,location=l)
-        for l in locations:
-            for (loc,steps) in l.steps_to.items():
-                self.graph.add_edge(l.name,loc,steps=steps)
-        self.player = Player();
-        return
-
-    # get possible checks for the player that have not been visited 
-    # realize this is not so useful since checks dont have obvious
-    # correspondence to locations
-    def get_next_checks(self):
-        items = self.player.key_items
-        return accessible_checks(self.locations,items)
-
-
-    def plot(self):
-        locations = self.locations
-        coords = dict(zip([l.name for l in locations],[l.coord for l in locations]))
-        labels = dict(zip([l.name for l in locations],[l.name for l in locations]))
-        annotations = dict()
-        for l in locations:
-            str = ''
-            for chk in l.checks:
-                if chk.item_count>0:
-                    str+= chk.action + ' : ' + chk.item[-1].name + '\n'
-            annotations[l.name]=str
-        
-        IG = netgraph.InteractiveGraph(self.graph, node_labels=True, node_label_fontdict=dict(size=10,fontweight='bold'),
-                                    node_layout=coords, 
-                                    node_size=5000, node_label_offset=100, edge_width=1000, 
-                                    node_shape = 'o', node_edge_color='blue', node_edge_width=1000,
-                                    annotations=annotations, annotation_fontdict = dict(fontsize=8))
-        plt.show()
 
 def convert_rule(jrule):
     rule_list = [];
@@ -316,7 +289,7 @@ def convert_rule(jrule):
             elif str == '$noCutTree':
                 pass
             elif str == 'talk_misty':
-                pass
+                rule.append(Rule.TALKMISTY)
             elif str == 'open_silver':
                 pass
             elif str == '$noEliteFour':
@@ -328,7 +301,7 @@ def convert_rule(jrule):
             elif str == "farfetch'd":
                 pass
             elif str == "red":
-                pass
+                rule.append(Rule.BEATRED)
             else:
                 import pdb; pdb.set_trace()
         rule_list.append(rule)
@@ -351,6 +324,8 @@ def logical_rules(helditems):
         rules.append(Rule.HAVEEIGHTBADGES)
     if Hm.CUT in helditems and Badge.HIVE in helditems:
         rules.append(Rule.CANUSECUT)
+    if Hm.FLY in helditems and Badge.STORM in helditems:
+        rules.append(Rule.CANUSEFLY)
     if Hm.SURF in helditems and Badge.FOG in helditems:
         rules.append(Rule.CANUSESURF)
     if Hm.STRENGTH in helditems and Badge.PLAIN in helditems:
@@ -363,58 +338,66 @@ def logical_rules(helditems):
         rules.append(Rule.CANUSEWATERFALL)
     return rules
 
-def progress_rules(helditems,logic):
+def progress_rules(helditems,logic,is_player=False):
     rules = [];
-    rules.append(Rule.ROCKETWELL)
+    if not is_player:
+        rules.append(Rule.ROCKETWELL)
     itemset = set(helditems)
     logicset = set(logic).union(itemset)
 
-    ecruteak = lambda : logicset.issuperset({Item.SQUIRTBOTTLE}) or\
+    ecruteak = logicset.issuperset({Item.SQUIRTBOTTLE}) or\
                         logicset.issuperset({Item.PASS,Item.SSTICKET})
-    saffron = lambda : logicset.issuperset({Item.PASS}) or\
+    saffron = logicset.issuperset({Item.PASS}) or\
                        logicset.issuperset({Item.SQUIRTBOTTLE,Item.SSTICKET})
-    snorlax = lambda : saffron() and logicset.issuperset({Item.POKEGEAR,Item.RADIOCARD,Item.EXPANSIONCARD})
-    if snorlax(): rules.append(Rule.SNORLAX); logicset.add(Rule.SNORLAX)
-    viridian = lambda : logicset.issuperset({Rule.SNORLAX,Rule.CANUSECUT}) or\
-                       logicset.issuperset({Rule.CANUSESURF,Rule.CANUSEWATERFALL,Rule.HAVEEIGHTBADGES})
+    if is_player:
+        snorlax = Rule.SNORLAX in helditems
+    else:
+        snorlax = saffron and logicset.issuperset({Item.POKEGEAR,Item.RADIOCARD,Item.EXPANSIONCARD})
+    if snorlax: rules.append(Rule.SNORLAX); logicset.add(Rule.SNORLAX)
+    viridian = logicset.issuperset({Rule.SNORLAX,Rule.CANUSECUT}) or\
+                logicset.issuperset({Rule.CANUSESURF,Rule.CANUSEWATERFALL,Rule.HAVEEIGHTBADGES})
 
-
-    if ecruteak(): rules.append(ImpTown.ECRUTEAK)
-    if saffron(): rules.append(ImpTown.SAFFRON)
-    if viridian(): rules.append(ImpTown.VIRIDIAN)
+    if ecruteak: rules.append(ImpTown.ECRUTEAK)
+    if saffron: rules.append(ImpTown.SAFFRON)
+    if viridian: rules.append(ImpTown.VIRIDIAN)
     
-    if saffron() and ( logicset.issuperset({Rule.CANUSECUT,Rule.CANUSESURF}) or logicset.issuperset({Rule.CANUSEFLASH,Rule.CANUSESURF}) ):
-        rules.append(Rule.POWERPLANTMANAGER)
-        if Item.MACHINEPART in itemset:
-            rules.append(Rule.FIXPOWERPLANT)
+    if not is_player:
+        if saffron and ( logicset.issuperset({Rule.CANUSECUT,Rule.CANUSESURF}) or logicset.issuperset({Rule.CANUSEFLASH,Rule.CANUSESURF}) ):
+            rules.append(Rule.POWERPLANTMANAGER)
+            rules.append(Rule.TALKMISTY)
+            if Item.MACHINEPART in itemset:
+                rules.append(Rule.FIXPOWERPLANT)
+    
+        if ecruteak:
+            rules.append(Rule.TALKJASMINE)
+            if Item.SECRETPOTION in logicset:
+                rules.append(Rule.RETURNPOTION)
+            if logicset.issuperset({Rule.CANUSESURF,Rule.CANUSESTRENGTH}):
+                rules.append(Rule.CHUCK)
+            if Rule.CANUSESURF in logicset:
+                rules.append(Rule.REDGYARADOS)
+                rules.append(Rule.ELECTRODE)
 
-    if ecruteak():
-        rules.append(Rule.TALKJASMINE)
-        if Item.SECRETPOTION in logicset:
-            rules.append(Rule.RETURNPOTION)
-        if logicset.issuperset({Rule.CANUSESURF,Rule.CANUSESTRENGTH}):
-            rules.append(Rule.CHUCK)
-        if Rule.CANUSESURF in logicset:
-            rules.append(Rule.REDGYARADOS)
-            rules.append(Rule.ELECTRODE)
+        if viridian:
+            if Rule.CANUSESURF in logicset:
+                rules.append(Rule.TALKBLUE)
+            #if logicset.issuperset({Item.POKEGEAR,Item.RADIOCARD,Item.EXPANSIONCARD}):
+        if logicset.issuperset({Rule.HAVEEIGHTBADGES,Rule.CANUSESURF,Rule.CANUSEWATERFALL}) or logicset.issuperset({Rule.SNORLAX,Rule.CANUSECUT}):
+            rules.append(Rule.ELITEFOUR)
 
-    if viridian():
-        if Rule.CANUSESURF in logicset:
-            rules.append(Rule.TALKBLUE)
-        #if logicset.issuperset({Item.POKEGEAR,Item.RADIOCARD,Item.EXPANSIONCARD}):
-    if logicset.issuperset({Rule.HAVEEIGHTBADGES,Rule.CANUSESURF,Rule.CANUSEWATERFALL}) or logicset.issuperset({Rule.SNORLAX,Rule.CANUSECUT}):
-        rules.append(Rule.ELITEFOUR)
-
-    if Rule.HAVEALLBADGES in logicset:
-        rules.append(Rule.OAK)
+        if Rule.HAVEALLBADGES in logicset:
+            rules.append(Rule.OAK)
 
 
     return rules
 
-def in_logic(helditems):
+def in_logic(helditems,is_player=False):
     logic_r = logical_rules(helditems)
-    progress_r = progress_rules(helditems,logic_r)
+    progress_r = progress_rules(helditems,logic_r,is_player)
     logic = set( (*helditems,*logic_r,*progress_r) ) # things 'inlogic'
+    if is_player:
+        logic.add(Rule.CANUSEFLASH)
+
     return logic
 
 def is_reachable(place,set_access):
@@ -432,8 +415,8 @@ def get_missing_rules(place,set_access):
         missing.append(set_rule.difference(set_access))
     return missing
 
-def accessible_checks(locations, helditems):
-    logic = in_logic(helditems)
+def accessible_checks(locations, helditems,is_player=False):
+    logic = in_logic(helditems,is_player)
     acc_checks = []
     set_blocks = set()
 
@@ -460,6 +443,17 @@ def accessible_checks(locations, helditems):
                 elif len(block)>=1: 
                     set_blocks = set_blocks.union(block)
     return (acc_checks, set_blocks)
+
+def accessible_locations(locations, helditems,is_player=False):
+    logic = in_logic(helditems,is_player)
+    acc_locs = []
+    set_blocks = set()
+
+    
+    for loc in locations:
+        if is_reachable(loc,logic):
+            acc_locs.append(loc.name)
+    return acc_locs
 
 # converts [items,rules] to [items,badges,hms]
 def get_items_from_rule(rule):
@@ -529,6 +523,10 @@ def get_items_from_rule(rule):
             items = get_items_from_rule(ImpTown.VIRIDIAN).union(
                     get_items_from_rule(Rule.CANUSESURF))
             return items
+        if rule == Rule.TALKMISTY:
+            items = get_items_from_rule(ImpTown.SAFFRON).union(
+                    get_items_from_rule(Rule.POWERPLANTMANAGER))
+            return items
 
         pdb.set_trace()
     return items
@@ -581,23 +579,32 @@ def read_json():
                 loc.steps_to = js[0]['steps_to']
             if 'access_rules' in js[0].keys():
                 loc.rules = convert_rule(js[0]['access_rules'])
+            if 'battles' in js[0].keys():
+                loc.battles = Battle.battle_from_list(js[0]['battles'])
             for check in js[0]['sections']:
                 if valid_check(check):
                     chk = Check()
+                    chk.location = loc.name
                     chk.action = check['name']
+                    chk.steps = check['steps']
                     if 'battles' in check.keys():
-                        loc.battles = Battle.battle_from_list(check['battles']);
+                        chk.battles = Battle.battle_from_list(check['battles']);
                     if 'access_rules' in check.keys():
                         chk.rules = convert_rule(check['access_rules'])
                     if 'item_count' in check.keys():
                         chk.item_count = check['item_count'];
                     elif 'hosted_item' in check.keys():
-                        if check['name'].find('Gym')>=0:
+                        if check['name']=='Gym - Chuck':
+                            chk.item_count =2;
+                            chk.item = convert_rule([check['hosted_item']])[0]
+                        elif check['name'].find('Gym')>=0:
                             chk.item_count = 1;
-                        elif check['name'].find('Speak To')>=0:
-                            chk.item_count = 0;
-                        elif check['name'].find('Red')>=0:
-                            chk.item_count = 0;
+                        elif check['name'].find('Red Gyarados')>=0 or check['name'].find('Electrodes')>=0:
+                            chk.item_count = 2;
+                            chk.item = convert_rule([check['hosted_item']])[0]
+                        elif check['name']=='Red':
+                            chk.item_count = 1;
+                            chk.item = convert_rule([check['hosted_item']])[0]
                         else:
                             chk.item_count = 1;
                             chk.item = convert_rule([check['hosted_item']])[0]
@@ -706,13 +713,18 @@ def run(count=1,verbose=False):
     for i in range(count):
         locations = copy.deepcopy(locs)
         randomize(locations,verbose)
-        rando = Game(locations)
+        rando = game.Game(locations)
         if count==1: return rando
         randos.append(rando)
     #rando.plot()
     return randos
 
 if __name__=='__main__':
+    import __main__ as randomizer
     rando = run()
-    #rando.plot()
-    randos = run(1000)
+    rando.plot()
+    #randos = run(1000)
+    rando.player.key_items.append(Hm.FLY)
+    rando.player.key_items.append(Badge.STORM)
+    rando.player.visited_locations.add('Goldenrod City')
+    rando.get_neighboring_locations()
