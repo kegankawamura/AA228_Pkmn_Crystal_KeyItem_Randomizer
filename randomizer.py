@@ -649,7 +649,7 @@ def randomize(locations,verbose=False):
         if count==0: # first item is bicycle to ensure early bike
             prev_acc_checks = acc_checks
             rand_item = Item.BICYCLE
-        elif count==5 and Hm.FLY not in items_accessible: # make fly within early-mid checks
+        elif count==8 and Hm.FLY not in items_accessible: # make fly within early-mid checks
             rand_item = Hm.FLY
         elif count==12 and Badge.STORM not in items_accessible:
             rand_item = Badge.STORM
