@@ -649,6 +649,10 @@ def randomize(locations,verbose=False):
         if count==0: # first item is bicycle to ensure early bike
             prev_acc_checks = acc_checks
             rand_item = Item.BICYCLE
+        elif count==5 and Hm.FLY not in items_accessible: # make fly within early-mid checks
+            rand_item = Hm.FLY
+        elif count==12 and Badge.STORM not in items_accessible:
+            rand_item = Badge.STORM
         elif  count == 12 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
             #pdb.set_trace()
