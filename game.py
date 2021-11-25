@@ -2,9 +2,11 @@ import numpy
 import networkx
 import netgraph
 import matplotlib.pyplot as plt
+import copy
 
 import randomizer
 from randomizer import Item,Hm,Badge,Rule
+
 
 class Player:
     def __init__(self):
@@ -34,9 +36,10 @@ class Player:
             self.exp %= lvl_up_exp
             lvl_up_exp = Player.level_exp(self.level+1)-Player.level_exp(self.level)
         return
+    # use medium slow experience group
     @staticmethod
     def level_exp(level):
-        return .5*level**3;
+        return 6/5*level**3 - 15*level**2 +100*level-140;
 
 class Game:
     def __init__(self,locations):
@@ -154,7 +157,15 @@ class Game:
 
 
 def create(count=1,verbose=False):
-    return randomizer.run(count,verbose)
+    randos = []
+    locs = randomizer.read_json()
+    for i in range(count):
+        locations = copy.deepcopy(locs)
+        randomizer.randomize(locations,verbose)
+        rando = Game(locations)
+        if count==1: return rando
+        randos.append(rando)
+    return randos
 
 def is_item(item):
     if isinstance(item,Item) or \
