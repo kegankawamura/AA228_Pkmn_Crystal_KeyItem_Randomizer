@@ -8,9 +8,6 @@ from enum import Enum,auto
 import random
 import pdb
 import netgraph
-import copy
-
-import game
 
 class AutoName(Enum):
     def _generate_next_value_(name, start, count, last_values):
@@ -164,26 +161,36 @@ class Battle:
         self.pokemon = [];
         self.beat = False;
 
-    def calculate_exp(self):
-        a = 1.5; b = 3; c = 2.5;
-        return numpy.sum([a*b*c*poke for poke in self.pokemon])
+    # using B/W exp curve 
+    def calculate_exp(self,player_level):
+        a=1.5 # trainer constant
+        b=137 # median base experience yield
+        return numpy.sum([ a*b*poke/5 *
+            ( (2*poke+10)/(poke+player_level+10) )**2.5 +1 
+                for poke in self.pokemon])
     # returns true if player beats this battle, and gives the player experience
     # returns false if player loses
     def battle(self,player):
         q = 20;
         l = player.level;
         for poke in self.pokemon:
-            adv = (q*l/(poke + q*l))**3 # squiggly line
-            if numpy.random.random_sample()>adv:
+            # these are just made up to be:
+            #   20% chance to win against 4 pokes, 40% lower level
+            #   80% '   ', match level
+            #   95% '   ', 25% higher level
+            interp_levels = [.6*poke,poke,1.25*poke]
+            interp_prob_win = [.67,.95,.98]
+            prob_win = numpy.interp(l,interp_levels,interp_prob_win)
+            if numpy.random.random_sample()>prob_win:
                 # lose against poke
                 return False;
         import pdb; pdb.set_trace;
-        player.gain_exp(self.calculate_exp());
+        player.gain_exp(self.calculate_exp(l));
         self.beat = True;
         return True;
-    # cost is assumed to be 20 sec per pokemon
+    # cost is assumed to be 30 sec per pokemon
     def cost(self):
-        return 20*len(self.pokemon)
+        return 30*len(self.pokemon)
 
 
 
@@ -706,18 +713,6 @@ def randomize(locations,verbose=False):
             ck.item.extend([random.choice(list(Trash)) for i in range(ck.item_count-len(ck.item))])
             count_trash +=1
     return locations
-
-def run(count=1,verbose=False):
-    randos = []
-    locs = read_json()
-    for i in range(count):
-        locations = copy.deepcopy(locs)
-        randomize(locations,verbose)
-        rando = game.Game(locations)
-        if count==1: return rando
-        randos.append(rando)
-    #rando.plot()
-    return randos
 
 if __name__=='__main__':
     import __main__ as randomizer
