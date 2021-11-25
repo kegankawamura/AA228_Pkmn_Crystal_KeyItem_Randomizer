@@ -87,6 +87,11 @@ class Game:
                 loc = self.graph.nodes[l]['location']
                 if loc.fly_point and not l in locs:
                     locs.append(l)
+        # hotfix for backwards kanto but no snorlax
+        if self.player.location=='Vermilion City':
+            if Rule.SNORLAX not in self.player.key_items:
+                if 'Pewter City' in locs:
+                    locs.remove('Pewter City')
         return locs
     # attempt a check, returns the item and cost 
     # item is None if check is failed or check is not valid (check_logic has to be True)
@@ -117,6 +122,11 @@ class Game:
         if location in self.graph.neighbors(self.player.location):
             steps = self.graph.edges[self.player.location,location]['steps']
             cost = steps/self.player.speed()
+            succeed,cost_battle = self.graph.nodes[location]['location'].attempt(self.player)
+            cost += cost_battle
+            if not succeed:
+                return (None,cost)
+
             self.player.go_to_location(location)
             self.time += cost
             return(location,cost)
@@ -124,6 +134,10 @@ class Game:
         cost = 0;
         for edge in zip( nodes,nodes[1:] ):
             cost += self.graph.edges[edge]['steps']/self.player.speed()
+            succeed,cost_battle = self.graph.nodes[edge[1]]['location'].attempt(self.player)
+            cost += cost_battle
+            if not succeed:
+                return (self.player.location,cost)
             self.player.go_to_location(edge[1])
         self.time += cost
         return (location,cost)
