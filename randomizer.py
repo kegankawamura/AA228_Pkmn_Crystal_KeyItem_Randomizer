@@ -100,6 +100,19 @@ class Location:
         self.battles = [];
         self.steps_to = {};
         self.fly_point = False;
+    def attempt(self,player):
+        cost = self.cost(player);
+        if(len(self.battles)):
+            for battle in self.battles:
+                # if already beaten trainer
+                if battle.beat: continue;
+                # if fail battle
+                if not battle.battle(player):
+                    return (False,cost)
+        return (True,cost)
+
+    def cost(self,player):
+        return sum([b.cost() for b in self.battles if not b.beat]);
 
     def unrevealed_checks(self):
         return [chk for chk in self.checks if not chk.revealed]
@@ -148,7 +161,7 @@ class Check:
         return (self.item,cost)
     # sum of cost to go (steps) and battle time
     def cost(self,player):
-        return self.steps/player.speed() + sum([b.cost() for b in self.battles]);
+        return self.steps/player.speed() + sum([b.cost() for b in self.battles if not b.beat]);
 
     def __str__(self):
         return self.action;
@@ -178,7 +191,11 @@ class Battle:
             #   20% chance to win against 4 pokes, 40% lower level
             #   80% '   ', match level
             #   95% '   ', 25% higher level
-            interp_levels = [.6*poke,poke,1.25*poke]
+            # making it slightly easier to beat red
+            if poke > 75:
+                interp_levels = [.5*poke,poke,1.15*poke]
+            else:
+                interp_levels = [.6*poke,poke,1.25*poke]
             interp_prob_win = [.67,.95,.98]
             prob_win = numpy.interp(l,interp_levels,interp_prob_win)
             if numpy.random.random_sample()>prob_win:
