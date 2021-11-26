@@ -770,7 +770,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
                     items_accessible.append(o_i)
                     item_pool.remove(o_i)
                     count += 1
-                    #observations.remove((o_c,o_i))
+
                     added_observations = True
                     if verbose:
                         print(f'observed {o_i.name} at check {o_c}')
