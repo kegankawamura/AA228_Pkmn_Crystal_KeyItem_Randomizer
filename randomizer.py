@@ -121,22 +121,21 @@ class Location:
     def __str__(self):
         return self.name ;
     def __repr__(self): return 'l: '+self.__str__()
+    def __deepcopy__(self,memodict={}):
+        new = Location()
+        new.name = self.name;
+        new.checks = copy.deepcopy(self.checks)
+        new.rules = self.rules;
+        new.coord = self.coord;
+        new.visited = self.visited;
+        new.battles = copy.deepcopy(self.battles);
+        new.steps_to = self.steps_to;
+        new.fly_point = self.fly_point;
+        return new
     # equality across different games, lazy but should work
     def __eq__(self,other):
         return self.name == other.name;
     
-class Route:
-    # path from Location to location
-    def __init__(self):
-        self.number = 0;
-        self.endpoints = [];
-        self.cost = [];
-        self.battles = [];
-    def __str__(self):
-        return str(self.number) + ' between '+ self.endpoints[0] + ' and '+self.endpoints[1];
-    def __repr__(self):
-        return 'r: ' + self.__str__();
-
 class Check:
     def __init__(self):
         self.action = '';
@@ -175,6 +174,17 @@ class Check:
         return self.action;
     def __repr__(self):
         return 'ck: ' + self.__str__();
+    def __deepcopy__(self,memodict={}):
+        new = Check();
+        new.action = self.action;
+        new.location = self.location;
+        new.rules = self.rules;
+        new.steps = self.steps;
+        new.battles = copy.deepcopy(self.battles);
+        new.item_count = self.item_count;
+        new.item = list(self.item);
+        new.revealed = self.revealed;
+        return new
 
 class Battle:
     def __init__(self):
@@ -215,6 +225,11 @@ class Battle:
     # cost is assumed to be 30 sec per pokemon
     def cost(self):
         return 30*len(self.pokemon)
+    def __deepcopy__(self,memodict={}):
+        new = Battle()
+        new.pokemon = self.pokemon
+        new.beat = self.beat
+        return new
 
 
 
