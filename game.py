@@ -155,20 +155,26 @@ class Game:
         coords = dict(zip([l.name for l in locations],[l.coord for l in locations]))
         labels = dict(zip([l.name for l in locations],[l.name for l in locations]))
         annotations = dict()
+        colors = dict()
         for l in locations:
             str = ''
             for chk in l.checks:
                 if chk.item_count>0:
                     str+= chk.action + ' : ' + ';'.join([item.name for item in chk.item]) + '\n'
             annotations[l.name]=str
+            if all([chk.revealed for chk in l.checks]):
+                colors[l.name] = 'green'
+            elif any([chk.revealed for chk in l.checks]):
+                colors[l.name] = 'orange'
+            else:
+                colors[l.name] = 'blue'
         
         IG = netgraph.InteractiveGraph(self.graph, node_labels=True, node_label_fontdict=dict(size=10,fontweight='bold'),
                                     node_layout=coords, 
                                     node_size=5000, node_label_offset=100, edge_width=1000, 
-                                    node_shape = 'o', node_edge_color='blue', node_edge_width=1000,
+                                    node_shape = 'o', node_edge_color=colors, node_edge_width=1000,
                                     annotations=annotations, annotation_fontdict = dict(fontsize=8))
         plt.show()
-
 
 def create(count=1,verbose=False):
     randos = []
@@ -176,6 +182,19 @@ def create(count=1,verbose=False):
     for i in range(count):
         locations = copy.deepcopy(locs)
         randomizer.randomize(locations,verbose)
+        rando = Game(locations)
+        if count==1: return rando
+        randos.append(rando)
+    return randos
+
+# returns a possible game state that is consistent with a series of observations
+#   observations is a list of (check,item) tuples
+def create_from_observations(observations,count=1,verbose=False):
+    randos = []
+    locs = randomizer.read_json()
+    for i in range(count):
+        locations = copy.deepcopy(locs)
+        randomizer.randomize_remaining(locations,observations,verbose)
         rando = Game(locations)
         if count==1: return rando
         randos.append(rando)
