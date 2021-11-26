@@ -10,8 +10,6 @@ import pdb
 import netgraph
 import copy
 
-import game
-
 class AutoName(Enum):
     def _generate_next_value_(name, start, count, last_values):
         return name
@@ -103,6 +101,19 @@ class Location:
         self.battles = [];
         self.steps_to = {};
         self.fly_point = False;
+    def attempt(self,player):
+        cost = self.cost(player);
+        if(len(self.battles)):
+            for battle in self.battles:
+                # if already beaten trainer
+                if battle.beat: continue;
+                # if fail battle
+                if not battle.battle(player):
+                    return (False,cost)
+        return (True,cost)
+
+    def cost(self,player):
+        return sum([b.cost() for b in self.battles if not b.beat]);
 
     def unrevealed_checks(self):
         return [chk for chk in self.checks if not chk.revealed]
@@ -110,6 +121,9 @@ class Location:
     def __str__(self):
         return self.name ;
     def __repr__(self): return 'l: '+self.__str__()
+    # equality across different games, lazy but should work
+    def __eq__(self,other):
+        return self.name == other.name;
     
 class Route:
     # path from Location to location
@@ -151,8 +165,12 @@ class Check:
         return (self.item,cost)
     # sum of cost to go (steps) and battle time
     def cost(self,player):
-        return self.steps/player.speed() + sum([b.cost() for b in self.battles]);
-
+        return self.steps/player.speed() + sum([b.cost() for b in self.battles if not b.beat]);
+    # equality across different games
+    def __hash__(self):
+        return hash(self.action)+hash(self.location)
+    def __eq__(self,other):
+        return hash(self)==hash(other)
     def __str__(self):
         return self.action;
     def __repr__(self):
@@ -164,26 +182,39 @@ class Battle:
         self.pokemon = [];
         self.beat = False;
 
-    def calculate_exp(self):
-        a = 1.5; b = 3; c = 2.5;
-        return numpy.sum([a*b*c*poke for poke in self.pokemon])
+    # using B/W exp curve 
+    def calculate_exp(self,player_level):
+        a=1.5 # trainer constant
+        b=137 # median base experience yield
+        return numpy.sum([ a*b*poke/5 *
+            ( (2*poke+10)/(poke+player_level+10) )**2.5 +1 
+                for poke in self.pokemon])
     # returns true if player beats this battle, and gives the player experience
     # returns false if player loses
     def battle(self,player):
         q = 20;
         l = player.level;
         for poke in self.pokemon:
-            adv = (q*l/(poke + q*l))**3 # squiggly line
-            if numpy.random.random_sample()>adv:
+            # these are just made up to be:
+            #   20% chance to win against 4 pokes, 40% lower level
+            #   80% '   ', match level
+            #   95% '   ', 25% higher level
+            # making it slightly easier to beat red
+            if poke > 75:
+                interp_levels = [.4*poke,.9*poke,1.15*poke]
+            else:
+                interp_levels = [.6*poke,poke,1.25*poke]
+            interp_prob_win = [.67,.95,.98]
+            prob_win = numpy.interp(l,interp_levels,interp_prob_win)
+            if numpy.random.random_sample()>prob_win:
                 # lose against poke
                 return False;
-        import pdb; pdb.set_trace;
-        player.gain_exp(self.calculate_exp());
+        player.gain_exp(self.calculate_exp(l));
         self.beat = True;
         return True;
-    # cost is assumed to be 20 sec per pokemon
+    # cost is assumed to be 30 sec per pokemon
     def cost(self):
-        return 20*len(self.pokemon)
+        return 30*len(self.pokemon)
 
 
 
@@ -303,7 +334,7 @@ def convert_rule(jrule):
             elif str == "red":
                 rule.append(Rule.BEATRED)
             else:
-                import pdb; pdb.set_trace()
+                raise Exception(f'rule {str} unknown')
         rule_list.append(rule)
     return rule_list;
 
@@ -433,7 +464,6 @@ def accessible_checks(locations, helditems,is_player=False):
                         if sum(isinstance(x,ImpTown) for x in block):
                             pass
                         elif len(block)>=1: 
-                            if Rule.SNORLAX in block and Rule.SNORLAX in logic: pdb.set_trace()
                             set_blocks = set_blocks.union(block)
         else:
             blocks = get_missing_rules(loc,logic)
@@ -527,8 +557,7 @@ def get_items_from_rule(rule):
             items = get_items_from_rule(ImpTown.SAFFRON).union(
                     get_items_from_rule(Rule.POWERPLANTMANAGER))
             return items
-
-        pdb.set_trace()
+        raise Exception(f'rule {rule} does not have a mapping to items')
     return items
 
 def read_json():
@@ -625,7 +654,6 @@ def randomize(locations,verbose=False):
     prev_acc_checks = []
     
     count = 0;
-    #cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or set(Item.PASS,Item.SSTICKET).issubset(set(items_accessible))
     cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.PASS in items_accessible
     cangetoutofSF = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.SSTICKET in items_accessible
     
@@ -642,12 +670,15 @@ def randomize(locations,verbose=False):
         if count==0: # first item is bicycle to ensure early bike
             prev_acc_checks = acc_checks
             rand_item = Item.BICYCLE
-        elif  count == 12 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
+        elif count==8 and Hm.FLY not in items_accessible: # make fly within early-mid checks
+            rand_item = Hm.FLY
+        elif count==12 and Badge.STORM not in items_accessible:
+            rand_item = Badge.STORM
+        elif  count == 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
-            #pdb.set_trace()
-        elif count == 15 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
+        elif count == 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
-        elif count > 19 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
+        elif count > 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
@@ -677,7 +708,6 @@ def randomize(locations,verbose=False):
             if try_count >=200:
                 print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
                 pdb.set_trace()
-                randomize(locations,verbose)
         # place item in check, and update sets of items
         rand_check.item.append(rand_item)
         items_accessible.append(rand_item)
@@ -707,22 +737,120 @@ def randomize(locations,verbose=False):
             count_trash +=1
     return locations
 
-def run(count=1,verbose=False):
-    randos = []
-    locs = read_json()
-    for i in range(count):
-        locations = copy.deepcopy(locs)
-        randomize(locations,verbose)
-        rando = game.Game(locations)
-        if count==1: return rando
-        randos.append(rando)
-    #rando.plot()
-    return randos
+# returns a randomized set of locations such that the set of observations is consistent
+#   observations is a list of (check,item) tuples
+def randomize_remaining(locations,obs_orig,verbose=False):
+    observations = copy.copy(obs_orig)
+    item_pool = set(Item).union(set(Hm)).union(set(Badge))
+    items_accessible = []
+    prev_acc_checks = []
+    
+    count = 0;
+    cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.PASS in items_accessible
+    cangetoutofSF = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.SSTICKET in items_accessible
+
+    blocked = True
+    while len(item_pool)>0:
+        try_count = 0;
+
+        if blocked:
+            acc_checks, blocks = accessible_checks(locations,items_accessible)
+            if len(blocks)==0:
+                blocked = False;
+                break
+        added_observations = False
+        for o_c,o_i in list(observations):
+            if o_c in acc_checks:
+                chk = next(c for c in acc_checks if c==o_c)
+                observations.remove((o_c,o_i))
+                chk.revealed=True
+                if o_i in item_pool:
+                    chk.item.append(o_i)
+                    if o_i == Trash.TRASH: continue;
+                    items_accessible.append(o_i)
+                    item_pool.remove(o_i)
+                    count += 1
+                    #observations.remove((o_c,o_i))
+                    added_observations = True
+                    if verbose:
+                        print(f'observed {o_i.name} at check {o_c}')
+        if added_observations: 
+            pass;
+            #continue;
+
+        if count>=0 and Item.BICYCLE not in items_accessible : # first item is bicycle to ensure early bike
+            prev_acc_checks = acc_checks
+            rand_item = Item.BICYCLE
+        elif count>=8 and Hm.FLY not in items_accessible: # make fly within early-mid checks
+            rand_item = Hm.FLY
+        elif count>=12 and Badge.STORM not in items_accessible:
+            rand_item = Badge.STORM
+        elif  count >= 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
+            rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
+        elif count >= 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
+            rand_item = random.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
+        elif count > 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
+            if Hm.SURF not in items_accessible: rand_item = Hm.SURF
+            elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
+        else:
+            # get random blocking item that hasnt been placed yet 
+            rand_block = random.choice(list(blocks))
+            possible_items = get_items_from_rule(rand_block)
+            rand_item = random.choice(list(possible_items))
+            try_count = 0;
+            while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
+                rand_block = random.choice(list(blocks))
+                possible_items = get_items_from_rule(rand_block)
+                rand_item = random.choice(list(possible_items))
+                try_count+=1
+                if try_count >=200:
+                    print(f'having trouble with {blocks} given these items: {items_accessible}')
+                    pdb.set_trace()
+
+    
+        # get random check that isnt filled already
+        weighted_checks = [*list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
+        while True:
+            # make new checks twice as likely to be selected
+            rand_check = random.choice(weighted_checks)
+            if len(rand_check.item)<rand_check.item_count and ( len(observations)==0 or rand_check not in list(zip(*observations))[0] ) :
+                break;
+            try_count+=1
+            if try_count >=200:
+                print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
+                pdb.set_trace()
+        # place item in check, and update sets of items
+        rand_check.item.append(rand_item)
+        items_accessible.append(rand_item)
+        item_pool.remove(rand_item)
+        if verbose:
+            print(f'putting {rand_item.name} at check {rand_check}')
+        count +=1
+        prev_acc_checks = acc_checks
+
+    if len(item_pool)>0:
+        while len(item_pool)>0:
+            rand_item = random.choice(list(item_pool))
+            rand_check = random.choice(acc_checks)
+            while len(rand_check.item)>=rand_check.item_count:
+                rand_check = random.choice(acc_checks)
+            # place item in check, and update sets of items
+            rand_check.item.append(rand_item)
+            items_accessible.append(rand_item)
+            item_pool.remove(rand_item)
+            if verbose:
+                print(f'putting {rand_item.name} at check {rand_check}')
+    
+    count_trash = 0
+    for ck in [ck for l in locations for ck in l.checks]:
+        if ck.item_count > len(ck.item):
+            ck.item.extend([random.choice(list(Trash)) for i in range(ck.item_count-len(ck.item))])
+            count_trash +=1
+    return locations
 
 if __name__=='__main__':
-    import __main__ as randomizer
-    rando = run()
-    rando.plot()
+    import game
+    rando = game.create()
     #randos = run(1000)
     rando.player.key_items.append(Hm.FLY)
     rando.player.key_items.append(Badge.STORM)
