@@ -2,7 +2,16 @@
 import game
 #from randomizer import Item,Hm,Badge,Rule
 if __name__=='__main__':
+
+    #import pickle
+    #observations = pickle.load( open('obsv.p','rb'))
+    #observations_orig = pickle.load( open('obsv.p','rb'))
+    #rando_record = game.create_from_observations(observations[:-5],verbose=True)
+    #quit()
+
+
     rando = game.create()
+    observations = [];
     
     while not rando.is_finished():
         while True:
@@ -37,8 +46,10 @@ if __name__=='__main__':
                 print(f'Player items: {[item.name for item in rando.player.key_items if isinstance(item,game.randomizer.Item)]}')
                 print(f'Player badges: {[badge.name for badge in rando.player.key_items if isinstance(badge,game.randomizer.Badge)]}')
                 print(f'Player HMs: {[hm.name for hm in rando.player.key_items if isinstance(hm,game.randomizer.Hm)]}')
-                print(f'completed checks : {rando.player.completed_checks}\n')
-                print(f'all possible checks: {rando.get_accessible_checks()}\n')
+                print(f'    completed checks : {rando.player.completed_checks}')
+                print(f'    all possible checks: {rando.get_accessible_checks()}\n')
+                rando_record = game.create_from_observations(observations,verbose=True)
+                rando_record.plot()
             if choice >0 and choice <=len(actions): break
         results,cost = rando.attempt_action(actions[choice-1])
         
@@ -48,6 +59,9 @@ if __name__=='__main__':
             print(f'Failed to achieve {actions[choice-1]}')
         else:
             for result in results:
+                observations.append((actions[choice-1],result))
                 print(f'Obtained {result}!')
 
         print(f'Cumulative Time: {rando.time}\n')
+
+    games = game.create_from_observations(observations,verbose=True,count=100)
