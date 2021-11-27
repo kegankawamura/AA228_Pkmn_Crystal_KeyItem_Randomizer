@@ -470,7 +470,8 @@ def accessible_checks(locations, helditems,is_player=False):
     for loc in locations:
         if is_reachable(loc,logic):
             for chk in loc.checks:
-                if is_reachable(chk,logic) and not chk.revealed:
+                if is_reachable(chk,logic) \
+                        and not (is_player and chk.revealed):
                     acc_checks.append(chk)
                 else:
                     blocks = get_missing_rules(chk,logic)
@@ -804,7 +805,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
         elif count >= 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
-        elif count > 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
+        elif count >= 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
@@ -815,7 +816,8 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             try_count = 0;
             while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
                 rand_block = random.choice(list(blocks))
-                possible_items = get_items_from_rule(rand_block)
+                possible_items = get_items_from_rule(rand_block).intersection(item_pool)
+                if len(possible_items)==0: continue
                 rand_item = random.choice(list(possible_items))
                 try_count+=1
                 if try_count >=200:
@@ -831,6 +833,8 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             if len(rand_check.item)<rand_check.item_count and ( len(observations)==0 or rand_check not in list(zip(*observations))[0] ) :
                 break;
             try_count+=1
+            if try_count ==150:
+                acc_checks, blocks = accessible_checks(locations,items_accessible)
             if try_count >=200:
                 print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
                 pdb.set_trace()
