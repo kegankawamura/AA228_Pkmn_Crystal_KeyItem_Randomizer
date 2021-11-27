@@ -42,7 +42,13 @@ class Player:
         return 6/5*level**3 - 15*level**2 +100*level-140;
 
 class Game:
-    def __init__(self,locations):
+    def __init__(self,locations=None):
+        if locations==None:
+            self.locations = None
+            self.graph = None
+            self.player = None
+            self.time = -1;
+            return 
         self.locations = locations;
         self.graph = networkx.Graph();
         for l in locations:
@@ -101,16 +107,28 @@ class Game:
         (item,cost) = check.attempt(self.player)
         self.time += cost
         return (item,cost)
+    # attempt a check, moving to the location if necessary
+    def attempt_accessible_check(self,check,check_logic=False):
+        if check in self.get_checks_here(): return self.attempt_check(check)
+
+        location,cost = self.go_to_location(check.location,check_logic)
+        if location != check.location: return (location,cost)
+        item,cost_check=self.attempt_check(check)
+        cost+= cost_check
+        return (item,cost)
+
     # attempt to go to a location, return bool(successful) and cost
     # go to location is successful if location is a neighboring location or fly point and can fly, and logic is set
     def go_to_location(self,location,check_logic=False):
+        # update graph
+        self.conditional_graph()
         logic = randomizer.logical_rules(self.player.key_items);
         if check_logic:
             if Rule.CANUSEFLY in logic and location in self.player.visited_locations:
                 # fly speed is considered to take 2 secs
                 self.player.go_to_location(location)
                 return (location,2);
-            if location not in self.accessible_locations(): return (False,0);
+            if location not in self.accessible_locations(): return (None,0);
             if location not in self.get_neighboring_locations(): return (None,0);
 
         if Rule.CANUSEFLY in logic and location in self.player.visited_locations:
@@ -130,7 +148,7 @@ class Game:
             self.player.go_to_location(location)
             self.time += cost
             return(location,cost)
-        nodes = networkx.shortest_path(self.graph,self.player.location,location)
+        nodes = networkx.shortest_path(self.graph,self.player.location,location,weight='steps')
         cost = 0;
         for edge in zip( nodes,nodes[1:] ):
             cost += self.graph.edges[edge]['steps']/self.player.speed()
@@ -147,6 +165,20 @@ class Game:
         if isinstance(action,str):
             return self.go_to_location(action,check_logic)
         raise Exception('action not a check or location name').with_traceback(tracebackobj)
+    
+    # 'removes' conditional paths depending on what the player has
+    def conditional_graph(self):
+        graph = self.graph;
+        if Rule.SNORLAX not in self.player.key_items: 
+            self.graph.edges[('Vermilion City','Pewter City')]['steps']=9999999
+        else:
+            self.graph.edges[('Vermilion City','Pewter City')]['steps']=100
+        if Item.SQUIRTBOTTLE not in self.player.key_items:
+            self.graph.edges[('Ecruteak City','Goldenrod City')]['steps']=9999999
+            self.graph.edges[('Ecruteak City','Violet City')]['steps']=9999999
+        else:
+            self.graph.edges[('Ecruteak City','Goldenrod City')]['steps']=180
+            self.graph.edges[('Ecruteak City','Violet City')]['steps']=50
 
     def is_finished(self):
         return Rule.BEATRED in self.player.key_items;
@@ -175,6 +207,12 @@ class Game:
                                     node_shape = 'o', node_edge_color=colors, node_edge_width=1000,
                                     annotations=annotations, annotation_fontdict = dict(fontsize=8))
         plt.show()
+    def __deepcopy__(self,memodict={}):
+        new = Game()
+        new.locations = copy.deepcopy(self.locations)
+        new.graph = copy.deepcopy(self.graph)
+        new.player = copy.deepcopy(self.player)
+        return new
 
 def create(count=1,verbose=False):
     randos = []
@@ -189,13 +227,14 @@ def create(count=1,verbose=False):
 
 # returns a possible game state that is consistent with a series of observations
 #   observations is a list of (check,item) tuples
-def create_from_observations(observations,count=1,verbose=False):
+def create_from_observations(observations,player,count=1,verbose=False):
     randos = []
     locs = randomizer.read_json()
     for i in range(count):
         locations = copy.deepcopy(locs)
         randomizer.randomize_remaining(locations,observations,verbose)
         rando = Game(locations)
+        rando.player = copy.deepcopy(player)
         if count==1: return rando
         randos.append(rando)
     return randos
