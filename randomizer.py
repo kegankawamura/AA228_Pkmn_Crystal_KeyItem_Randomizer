@@ -101,6 +101,12 @@ class Location:
         self.battles = [];
         self.steps_to = {};
         self.fly_point = False;
+    # returns approximate probability of successfully moving to this location
+    def prob_success(self,player):
+        prob = 1
+        for battle in self.battles:
+            prob *= battle.prob_success(player)
+        return prob;
     def attempt(self,player):
         cost = self.cost(player);
         if(len(self.battles)):
@@ -146,6 +152,13 @@ class Check:
         self.item_count = 0;
         self.item = [];
         self.revealed = False;
+    # returns the approximate probability of success
+    def prob_success(self,player):
+        prob = 1
+        for battle in self.battles:
+            if battle.beat: continue;
+            prob *= battle.prob_success(player)
+        return prob;
     # returns item (None if fail) and time cost
     def attempt(self,player):
         cost = self.cost(player);
@@ -191,14 +204,25 @@ class Battle:
         # list of pokemon (levels)
         self.pokemon = [];
         self.beat = False;
-
-    # using B/W exp curve 
+    
+    # using B/W exp curve , with some cheating
     def calculate_exp(self,player_level):
         a=1.5 # trainer constant
         b=137 # median base experience yield
         return numpy.sum([ a*b*poke/5 *
-            ( (2*poke+10)/(poke+player_level+10) )**2.5 +1 
+            ( (4*poke-5)/(poke+player_level-5) )**2.5 +1 
                 for poke in self.pokemon])
+        #return numpy.sum([ a*b*poke/5 *
+        #    ( (2*poke+10)/(poke+player_level+10) )**2.5 +1 
+        #        for poke in self.pokemon])
+    # returns approximate probability of success
+    def prob_success(self,player):
+        prob = 1;
+        l = player.level;
+        for poke in self.pokemon:
+            prob_win = Battle.interp_prob_win(l,poke)
+            prob *= prob_win
+        return prob
     # returns true if player beats this battle, and gives the player experience
     # returns false if player loses
     def battle(self,player):
@@ -206,16 +230,11 @@ class Battle:
         l = player.level;
         for poke in self.pokemon:
             # these are just made up to be:
-            #   20% chance to win against 4 pokes, 40% lower level
+            #   20% chance to win against 4 pokes, 60% lower level
             #   80% '   ', match level
             #   95% '   ', 25% higher level
             # making it slightly easier to beat red
-            if poke > 75:
-                interp_levels = [.4*poke,.9*poke,1.15*poke]
-            else:
-                interp_levels = [.6*poke,poke,1.25*poke]
-            interp_prob_win = [.67,.95,.98]
-            prob_win = numpy.interp(l,interp_levels,interp_prob_win)
+            prob_win = Battle.interp_prob_win(l,poke)
             if numpy.random.random_sample()>prob_win:
                 # lose against poke
                 return False;
@@ -244,6 +263,14 @@ class Battle:
             battle.pokemon = b;
             battles.append(battle)
         return battles
+    def interp_prob_win(player_level,poke):
+        if poke > 75:
+            interp_levels = [.3*poke,.9*poke,1.15*poke,1.2*poke]
+        else:
+            interp_levels = [.4*poke,poke,1.25*poke,1.3*poke]
+        interp_prob_win = [.8,.95,.98,.999]
+        prob_win = numpy.interp(player_level,interp_levels,interp_prob_win)
+        return prob_win
 
 def convert_rule(jrule):
     rule_list = [];
@@ -799,10 +826,10 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             rand_item = Item.BICYCLE
         elif count>=8 and Hm.FLY not in items_accessible: # make fly within early-mid checks
             rand_item = Hm.FLY
-        elif count>=12 and Badge.STORM not in items_accessible:
-            rand_item = Badge.STORM
         elif  count >= 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
+        elif count>=12 and Badge.STORM not in items_accessible:
+            rand_item = Badge.STORM
         elif count >= 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
         elif count >= 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
@@ -835,6 +862,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             try_count+=1
             if try_count ==150:
                 acc_checks, blocks = accessible_checks(locations,items_accessible)
+                weighted_checks = acc_checks
             if try_count >=200:
                 print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
                 pdb.set_trace()
