@@ -36,10 +36,11 @@ class Player:
             self.exp %= lvl_up_exp
             lvl_up_exp = Player.level_exp(self.level+1)-Player.level_exp(self.level)
         return
-    # use medium slow experience group
+    # use medium fast experience group
     @staticmethod
     def level_exp(level):
-        return 6/5*level**3 - 15*level**2 +100*level-140;
+        return level**3
+        #return 6/5*level**3 - 15*level**2 +100*level-140;
 
 class Game:
     def __init__(self,locations=None):
@@ -99,12 +100,16 @@ class Game:
                 if 'Pewter City' in locs:
                     locs.remove('Pewter City')
         return locs
+    # in case the check is not directly from this game
+    def find_check(self,check):
+        checks = self.graph.nodes[check.location]['location'].checks
+        return next(c for c in checks if c==check)
     # attempt a check, returns the item and cost 
     # item is None if check is failed or check is not valid (check_logic has to be True)
     def attempt_check(self,check,check_logic=False):
         if check_logic:
             if check not in self.get_checks_here(): return (None,0)
-        (item,cost) = check.attempt(self.player)
+        (item,cost) = self.find_check(check).attempt(self.player)
         self.time += cost
         return (item,cost)
     # attempt a check, moving to the location if necessary
@@ -116,6 +121,16 @@ class Game:
         item,cost_check=self.attempt_check(check)
         cost+= cost_check
         return (item,cost)
+    # get approximate probability of successfully executing check
+    def prob_success(self,check):
+        if check in self.get_checks_here(): return self.find_check(check).prob_success(self.player)
+        self.conditional_graph()
+        nodes = networkx.shortest_path(self.graph,self.player.location,check.location,weight='steps')
+        prob = 1;
+        for loc in nodes[1:]:
+            prob *= self.graph.nodes[loc]['location'].prob_success(self.player)
+        prob *= self.find_check(check).prob_success(self.player)
+        return prob
 
     # attempt to go to a location, return bool(successful) and cost
     # go to location is successful if location is a neighboring location or fly point and can fly, and logic is set
@@ -186,12 +201,51 @@ class Game:
         locations = self.locations
         coords = dict(zip([l.name for l in locations],[l.coord for l in locations]))
         labels = dict(zip([l.name for l in locations],[l.name for l in locations]))
+        colors = list()
+        for loc in self.graph.nodes():
+            l = self.graph.nodes[loc]['location']
+            if loc == self.player.location: colors.append('blue')
+            elif all([chk.revealed for chk in l.checks]):
+                colors.append('green')
+            elif any([chk.revealed for chk in l.checks]):
+                colors.append('orange')
+            else: colors.append('grey')
+
+        #for l in locations:
+        #    str = ''
+        #    if all([chk.revealed for chk in l.checks]):
+        #        colors[l.name] = 'green'
+        #    elif any([chk.revealed for chk in l.checks]):
+        #        colors[l.name] = 'orange'
+        #    else:
+        #        colors[l.name] = 'white'
+        #    if l.name == self.player.location:
+        #        color_player[l.name] = 'blue'
+        #        colors[l.name] = 'blue'
+            #else: color_player[l.name] = 'white'
+        
+        networkx.draw(self.graph, with_labels=True, font_size=10,font_weight='bold',
+                                    pos=coords, 
+                                    node_size=150, width=2, 
+                                    node_shape = 'o', node_color=colors
+                                    )
+        plt.ion()
+        plt.show()
+        plt.pause(.1)
+
+    def plot_interactive(self):
+        locations = self.locations
+        coords = dict(zip([l.name for l in locations],[l.coord for l in locations]))
+        labels = dict(zip([l.name for l in locations],[l.name for l in locations]))
         annotations = dict()
         colors = dict()
+        color_player = dict()
         for l in locations:
             str = ''
             for chk in l.checks:
                 if chk.item_count>0:
+                    if chk.revealed:
+                        str+='\N{check mark}'
                     str+= chk.action + ' : ' + ';'.join([item.name for item in chk.item]) + '\n'
             annotations[l.name]=str
             if all([chk.revealed for chk in l.checks]):
@@ -200,17 +254,27 @@ class Game:
                 colors[l.name] = 'orange'
             else:
                 colors[l.name] = 'blue'
+            if l.name == self.player.location:
+                color_player[l.name] = 'blue'
+            else: color_player[l.name] = 'white'
         
         IG = netgraph.InteractiveGraph(self.graph, node_labels=True, node_label_fontdict=dict(size=10,fontweight='bold'),
                                     node_layout=coords, 
                                     node_size=5000, node_label_offset=100, edge_width=1000, 
-                                    node_shape = 'o', node_edge_color=colors, node_edge_width=1000,
+                                    node_shape = 'o', node_edge_color=colors, node_color=color_player,node_edge_width=1000,
                                     annotations=annotations, annotation_fontdict = dict(fontsize=8))
+        plt.ioff()
         plt.show()
+
     def __deepcopy__(self,memodict={}):
         new = Game()
         new.locations = copy.deepcopy(self.locations)
-        new.graph = copy.deepcopy(self.graph)
+        new.graph = networkx.Graph();
+        for l in new.locations:
+            new.graph.add_node(l.name,location=l)
+        for l in new.locations:
+            for (loc,steps) in l.steps_to.items():
+                new.graph.add_edge(l.name,loc,steps=steps)
         new.player = copy.deepcopy(self.player)
         return new
 
