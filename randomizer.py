@@ -5,7 +5,6 @@ import networkx
 import matplotlib.pyplot as plt
 import os
 from enum import Enum,auto
-import random
 import pdb
 import netgraph
 import copy
@@ -691,7 +690,10 @@ def read_json():
     #       repeat until graph is complete (all checks are available)
     #       fill in rest of items
 
-def randomize(locations,verbose=False):
+def randomize(locations,rng=None,verbose=False):
+    if rng==None:
+        rng = numpy.random.default_rng()
+
     item_pool = set(Item).union(set(Hm)).union(set(Badge))
     items_accessible = []
     prev_acc_checks = []
@@ -718,22 +720,22 @@ def randomize(locations,verbose=False):
         elif count==12 and Badge.STORM not in items_accessible:
             rand_item = Badge.STORM
         elif  count == 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
-            rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
+            rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.PASS])
         elif count == 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
-            rand_item = random.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
+            rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
         elif count > 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
             # get random blocking item that hasnt been placed yet
-            rand_block = random.choice(list(blocks))
+            rand_block = rng.choice(list(blocks))
             possible_items = get_items_from_rule(rand_block)
-            rand_item = random.choice(list(possible_items))
+            rand_item = rng.choice(list(possible_items))
             try_count = 0;
             while rand_item not in item_pool:
-                rand_block = random.choice(list(blocks))
+                rand_block = rng.choice(list(blocks))
                 possible_items = get_items_from_rule(rand_block)
-                rand_item = random.choice(list(possible_items))
+                rand_item = rng.choice(list(possible_items))
                 try_count+=1
                 if try_count >=200:
                     print(f'having trouble with {blocks} given these items: {items_accessible}')
@@ -744,7 +746,7 @@ def randomize(locations,verbose=False):
         weighted_checks = [*list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
         while True:
             # make new checks twice as likely to be selected
-            rand_check = random.choice(weighted_checks)
+            rand_check = rng.choice(weighted_checks)
             if len(rand_check.item)<rand_check.item_count:
                 break;
             try_count+=1
@@ -762,10 +764,10 @@ def randomize(locations,verbose=False):
 
     if len(item_pool)>0:
         while len(item_pool)>0:
-            rand_item = random.choice(list(item_pool))
-            rand_check = random.choice(acc_checks)
+            rand_item = rng.choice(list(item_pool))
+            rand_check = rng.choice(acc_checks)
             while len(rand_check.item)>=rand_check.item_count:
-                rand_check = random.choice(acc_checks)
+                rand_check = rng.choice(acc_checks)
             # place item in check, and update sets of items
             rand_check.item.append(rand_item)
             items_accessible.append(rand_item)
@@ -776,13 +778,16 @@ def randomize(locations,verbose=False):
     count_trash = 0
     for ck in [ck for l in locations for ck in l.checks]:
         if ck.item_count > len(ck.item):
-            ck.item.extend([random.choice(list(Trash)) for i in range(ck.item_count-len(ck.item))])
+            ck.item.extend([rng.choice(list(Trash)) for i in range(ck.item_count-len(ck.item))])
             count_trash +=1
     return locations
 
 # returns a randomized set of locations such that the set of observations is consistent
 #   observations is a list of (check,item) tuples
-def randomize_remaining(locations,obs_orig,verbose=False):
+def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
+    if rng==None:
+        rng = numpy.random.default_rng()
+
     observations = copy.copy(obs_orig)
     item_pool = set(Item).union(set(Hm)).union(set(Badge))
     items_accessible = []
@@ -827,25 +832,25 @@ def randomize_remaining(locations,obs_orig,verbose=False):
         elif count>=8 and Hm.FLY not in items_accessible: # make fly within early-mid checks
             rand_item = Hm.FLY
         elif  count >= 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
-            rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
+            rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.PASS])
         elif count>=12 and Badge.STORM not in items_accessible:
             rand_item = Badge.STORM
         elif count >= 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
-            rand_item = random.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
+            rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
         elif count >= 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
             # get random blocking item that hasnt been placed yet
-            rand_block = random.choice(list(blocks))
+            rand_block = rng.choice(list(blocks))
             possible_items = get_items_from_rule(rand_block)
-            rand_item = random.choice(list(possible_items))
+            rand_item = rng.choice(list(possible_items))
             try_count = 0;
             while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
-                rand_block = random.choice(list(blocks))
+                rand_block = rng.choice(list(blocks))
                 possible_items = get_items_from_rule(rand_block).intersection(item_pool)
                 if len(possible_items)==0: continue
-                rand_item = random.choice(list(possible_items))
+                rand_item = rng.choice(list(possible_items))
                 try_count+=1
                 if try_count >=200:
                     print(f'having trouble with {blocks} given these items: {items_accessible}')
@@ -856,7 +861,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
         weighted_checks = [*list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
         while True:
             # make new checks twice as likely to be selected
-            rand_check = random.choice(weighted_checks)
+            rand_check = rng.choice(weighted_checks)
             if len(rand_check.item)<rand_check.item_count and ( len(observations)==0 or rand_check not in list(zip(*observations))[0] ) :
                 break;
             try_count+=1
@@ -877,10 +882,10 @@ def randomize_remaining(locations,obs_orig,verbose=False):
 
     if len(item_pool)>0:
         while len(item_pool)>0:
-            rand_item = random.choice(list(item_pool))
-            rand_check = random.choice(acc_checks)
+            rand_item = rng.choice(list(item_pool))
+            rand_check = rng.choice(acc_checks)
             while len(rand_check.item)>=rand_check.item_count:
-                rand_check = random.choice(acc_checks)
+                rand_check = rng.choice(acc_checks)
             # place item in check, and update sets of items
             rand_check.item.append(rand_item)
             items_accessible.append(rand_item)
@@ -891,7 +896,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
     count_trash = 0
     for ck in [ck for l in locations for ck in l.checks]:
         if ck.item_count > len(ck.item):
-            ck.item.extend([random.choice(list(Trash)) for i in range(ck.item_count-len(ck.item))])
+            ck.item.extend([rng.choice(list(Trash)) for i in range(ck.item_count-len(ck.item))])
             count_trash +=1
     return locations
 

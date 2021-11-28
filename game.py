@@ -278,12 +278,19 @@ class Game:
         new.player = copy.deepcopy(self.player)
         return new
 
-def create(count=1,verbose=False):
+def create(count=1,seed=None,verbose=False):
+    if seed==None:
+        # not actually random enough, but should be fine
+        seed = numpy.random.randint(2**63)
+        if verbose:
+            print(f'no seed given, using seed {seed}')
+    rng = numpy.random.default_rng(seed)
+
     randos = []
     locs = randomizer.read_json()
     for i in range(count):
         locations = copy.deepcopy(locs)
-        randomizer.randomize(locations,verbose)
+        randomizer.randomize(locations,rng,verbose)
         rando = Game(locations)
         if count==1: return rando
         randos.append(rando)
@@ -291,12 +298,19 @@ def create(count=1,verbose=False):
 
 # returns a possible game state that is consistent with a series of observations
 #   observations is a list of (check,item) tuples
-def create_from_observations(observations,player,count=1,verbose=False):
+def create_from_observations(observations,player,count=1,seed=None,verbose=False):
+    if seed==None:
+        # not actually random enough, but should be fine
+        seed = numpy.random.randint(2**63)
+        if verbose:
+            print(f'no seed given, using seed {seed}')
+    rng = numpy.random.default_rng(seed)
+
     randos = []
     locs = randomizer.read_json()
     for i in range(count):
         locations = copy.deepcopy(locs)
-        randomizer.randomize_remaining(locations,observations,verbose)
+        randomizer.randomize_remaining(locations,observations,rng,verbose)
         rando = Game(locations)
         rando.player = copy.deepcopy(player)
         if count==1: return rando
@@ -309,7 +323,7 @@ def copy_with_observations(currGame, observations, count=1, verbose=False):
         copy_game_state(rando, currGame)
     return randos
 
-def copy_game_state(newGame, oldGame):]
+def copy_game_state(newGame, oldGame):
         newGame.time = oldGame.time
 
         newGame.player.level = oldGame.player.level;
