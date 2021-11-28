@@ -231,7 +231,7 @@ class Game:
                                     )
         plt.ion()
         plt.show()
-        plt.pause(.1)
+        plt.pause(.001)
 
     def plot_interactive(self):
         locations = self.locations
