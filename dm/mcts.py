@@ -3,7 +3,7 @@ import random
 import numpy as np
 import randomizer
 from ../randomizer import Item, Trash, Badge, Hm
-import ../game as gm 
+import ../game as gm
 import rewards as rw
 from copy import deepcopy
 
@@ -48,33 +48,73 @@ def item_error_message(elementEnum, lenEnum):
         return True
     return False
 
-
+'''
+Monte Carlo Tree Search Class
+'''
 class MCTS:
 
-    def __init__(self, crystalGame, discount, rolloutPolicy=None):
+    '''
+    Constructor Method
+        crystalGame: instance of Game class agent is playing on
+        discount: discount factor for Bellman Equation
+        rolloutPolicy: rollout policy for determining U(s).
+                        Must have an input for a game instance and set of
+                        possible actions.
+                        Default is a random policy.
+        numParticles: number of "particles", or different game states,
+                        to simulate on
+    '''
+    def __init__(self, crystalGame, discount, rolloutPolicy=None,numParticles = 3):
         self._game = crystalGame
         self._Q = dict()
         self._N = dict()
         self._U = dict()
         self._gamma = discount
+        self._observations = []
         if rolloutPolicy:
             self.rolloutPolicy = rolloutPolicy
         else:
             self.rolloutPolicy = MCTS.randomStep
 
-    # Call this in __main__ when we need to choose an action
+        self._particles = game.create_from_observations(self._observations,count=numParticles)
+
+
+    '''
+    Given a set of actions, Monte Carlo Tree Search will choose the best action
+        actions: set of possible actions
+        m: the number of simulations per particle
+    '''
     def chooseAction(self, actions, m = 5):
-        for k in range(m):
-            virtualGame = copy.deepcopy(self._game)
-            self.simulate(virtualGame, actions)
+
+        for p in self._particles:
+            copy_game_state(p, self._game)
+            for k in range(m):
+                virtualGame = copy.deepcopy(self._game)
+                self.simulate(virtualGame, actions)
 
         return np.argmax([Q[(s,a)] for a in actions])
+
+
+    '''
+    Adds an observation to the class instance for generating new particles
+        o: tuple of (action, result)
+        numParticles: number of "particles", or different game states,
+                        to generate from the updated generative model
+    '''
+    def addObservation(self, o, numParticles=len(self._particles)):
+        self._observations.append(o)
+        self._particles = game.create_from_observations(self._observations,count=numParticles)
+        for p in self._particles:
+            game.copy_game_state(p, self._game)
 
     @staticmethod
     def randomStep(vgame, actions):
         return random.choice(actions)
 
-    def rollout(self, vgame, actions d):
+    '''
+    Rollout for simulation on virtual game
+    '''
+    def rollout(self, vgame, actions, d):
         ret = 0.0
         for t in range(d):
             a = self.rolloutPolicy(vgame, actions)
@@ -95,14 +135,17 @@ class MCTS:
         else:
             return c*sqrt(Ns/Nsa)
 
-
+    '''
+    Method for choosing the next action in MCTS. Employs UCB1 heuristic
+    '''
     def explore(self, s, actions):
-        c = 10
         Ns = sum([N[(s,a)] for a in actions])
-        a_idx = np.argmax([Q[(s,a)+UCB1_bonus(N[(s,a)], Ns, c) for a in actions])
+        a_idx = np.argmax([Q[(s,a)+UCB1_bonus(N[(s,a)], Ns, c=10) for a in actions])
         return actions[a_idx]
 
-
+    '''
+    Simulation function for MCTS
+    '''
     def simulate(self, vgame, actions, d = 5):
 
         s = state(vgame)

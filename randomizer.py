@@ -53,7 +53,7 @@ class Badge(AutoName):
 class Hm(Enum):
     CUT         = 1
     FLY         = 2
-    SURF        = 3 
+    SURF        = 3
     STRENGTH    = 4
     FLASH       = 5
     WATERFALL   = 6
@@ -64,7 +64,7 @@ class Rule(AutoName):
     CANUSEFLY           = auto()
     CANUSESURF          = auto()
     CANUSEWHIRLPOOL     = auto()
-    CANUSESTRENGTH      = auto() 
+    CANUSESTRENGTH      = auto()
     CANUSEWATERFALL     = auto()
     CANUSEFLASH         = auto()
     CANFIGHTTEAMROCKET  = auto()
@@ -78,7 +78,7 @@ class Rule(AutoName):
     ROCKETWELL          = auto()
     FIXPOWERPLANT       = auto()
     REDGYARADOS         = auto()
-    ELECTRODE           = auto() 
+    ELECTRODE           = auto()
     OAK                 = auto()
     ELITEFOUR           = auto()
     RETURNPOTION        = auto()
@@ -92,7 +92,7 @@ class ImpTown(Enum):
 
 class Location:
     def __init__(self):
-        # collection of checks 
+        # collection of checks
         self.name = '';
         self.checks = [];
         self.rules = [];
@@ -124,7 +124,7 @@ class Location:
     # equality across different games, lazy but should work
     def __eq__(self,other):
         return self.name == other.name;
-    
+
 class Route:
     # path from Location to location
     def __init__(self):
@@ -182,12 +182,12 @@ class Battle:
         self.pokemon = [];
         self.beat = False;
 
-    # using B/W exp curve 
+    # using B/W exp curve
     def calculate_exp(self,player_level):
         a=1.5 # trainer constant
         b=137 # median base experience yield
         return numpy.sum([ a*b*poke/5 *
-            ( (2*poke+10)/(poke+player_level+10) )**2.5 +1 
+            ( (2*poke+10)/(poke+player_level+10) )**2.5 +1
                 for poke in self.pokemon])
     # returns true if player beats this battle, and gives the player experience
     # returns false if player loses
@@ -391,14 +391,14 @@ def progress_rules(helditems,logic,is_player=False):
     if ecruteak: rules.append(ImpTown.ECRUTEAK)
     if saffron: rules.append(ImpTown.SAFFRON)
     if viridian: rules.append(ImpTown.VIRIDIAN)
-    
+
     if not is_player:
         if saffron and ( logicset.issuperset({Rule.CANUSECUT,Rule.CANUSESURF}) or logicset.issuperset({Rule.CANUSEFLASH,Rule.CANUSESURF}) ):
             rules.append(Rule.POWERPLANTMANAGER)
             rules.append(Rule.TALKMISTY)
             if Item.MACHINEPART in itemset:
                 rules.append(Rule.FIXPOWERPLANT)
-    
+
         if ecruteak:
             rules.append(Rule.TALKJASMINE)
             if Item.SECRETPOTION in logicset:
@@ -451,7 +451,7 @@ def accessible_checks(locations, helditems,is_player=False):
     acc_checks = []
     set_blocks = set()
 
-    
+
     for loc in locations:
         if is_reachable(loc,logic):
             for chk in loc.checks:
@@ -463,14 +463,14 @@ def accessible_checks(locations, helditems,is_player=False):
                         # if a check is blocked by city progression, pass
                         if sum(isinstance(x,ImpTown) for x in block):
                             pass
-                        elif len(block)>=1: 
+                        elif len(block)>=1:
                             set_blocks = set_blocks.union(block)
         else:
             blocks = get_missing_rules(loc,logic)
             for block in blocks:
                 if sum(isinstance(x,ImpTown) for x in block):
                     pass
-                elif len(block)>=1: 
+                elif len(block)>=1:
                     set_blocks = set_blocks.union(block)
     return (acc_checks, set_blocks)
 
@@ -479,7 +479,7 @@ def accessible_locations(locations, helditems,is_player=False):
     acc_locs = []
     set_blocks = set()
 
-    
+
     for loc in locations:
         if is_reachable(loc,logic):
             acc_locs.append(loc.name)
@@ -512,7 +512,7 @@ def get_items_from_rule(rule):
             get_items_from_rule(Rule.CANUSESURF)).union(
             get_items_from_rule(Rule.CANUSEWATERFALL)).union(
             get_items_from_rule(Rule.SNORLAX)).union(
-            get_items_from_rule(Rule.CANUSECUT)) 
+            get_items_from_rule(Rule.CANUSECUT))
             return items
         if rule == ImpTown.ECRUTEAK:
             items = items.union({Item.PASS,Item.SQUIRTBOTTLE,Item.SSTICKET})
@@ -563,20 +563,20 @@ def get_items_from_rule(rule):
 def read_json():
     locations_path = 'pokemon-crystal-randomizer-tracker/locations/'
     locations = [];
-    
+
     for filepath in sorted(os.scandir(locations_path),key=lambda fp: fp.name):
         if (not filepath.name.endswith(".json") or filepath.name.find('virtual')>=0):
             continue;
         #print(filepath.path)
         file = open(filepath.path)
         js = json.load(file)
-        
+
         # structure of json:
         #           list of size 1 :
         #               dict with fields:
         #                   'name' - string name
         #                   'access_rules' - list of access rules (str)
-        #                   'sections' - dict of checks at this location (dicts): 
+        #                   'sections' - dict of checks at this location (dicts):
         #                       'name' - string name
         #                       ## sections may or may not have the following keys
         #                       'access_rules' - list of access rules (str)
@@ -585,16 +585,16 @@ def read_json():
         #                       'map'
         #                       'x'
         #                       'y'
-        
+
         valid_check = lambda check: 'visibility_rules' not in check.keys() or check['visibility_rules'][0]=='tin_tower'
-    
+
         valid_location = False;
         # get valid checks in extreme KIR
         for check in js[0]['sections']:
             if valid_check(check):
                 valid_location = True;
                 break
-        
+
         if valid_location:
             loc = Location()
             loc.name = js[0]['name']
@@ -637,26 +637,26 @@ def read_json():
                         else:
                             chk.item_count = 1;
                             chk.item = convert_rule([check['hosted_item']])[0]
-    
+
                     loc.checks.append(chk)
             locations.append(loc)
     return locations
 
     # idea: maintain a graph and game state (available items, locations, and abilities)
     #       get set of limiting items (any that block a check)
-    #       randomly sample limiting items and place in random available check 
+    #       randomly sample limiting items and place in random available check
     #       repeat until graph is complete (all checks are available)
     #       fill in rest of items
-    
+
 def randomize(locations,verbose=False):
     item_pool = set(Item).union(set(Hm)).union(set(Badge))
     items_accessible = []
     prev_acc_checks = []
-    
+
     count = 0;
     cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.PASS in items_accessible
     cangetoutofSF = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.SSTICKET in items_accessible
-    
+
     blocked = True
     while len(item_pool)>0:
         try_count = 0;
@@ -666,7 +666,7 @@ def randomize(locations,verbose=False):
             if len(blocks)==0:
                 blocked = False;
                 break
-    
+
         if count==0: # first item is bicycle to ensure early bike
             prev_acc_checks = acc_checks
             rand_item = Item.BICYCLE
@@ -682,7 +682,7 @@ def randomize(locations,verbose=False):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
-            # get random blocking item that hasnt been placed yet 
+            # get random blocking item that hasnt been placed yet
             rand_block = random.choice(list(blocks))
             possible_items = get_items_from_rule(rand_block)
             rand_item = random.choice(list(possible_items))
@@ -696,7 +696,7 @@ def randomize(locations,verbose=False):
                     print(f'having trouble with {blocks} given these items: {items_accessible}')
                     pdb.set_trace()
 
-    
+
         # get random check that isnt filled already
         weighted_checks = [*list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
         while True:
@@ -729,7 +729,7 @@ def randomize(locations,verbose=False):
             item_pool.remove(rand_item)
             if verbose:
                 print(f'putting {rand_item.name} at check {rand_check}')
-    
+
     count_trash = 0
     for ck in [ck for l in locations for ck in l.checks]:
         if ck.item_count > len(ck.item):
@@ -744,7 +744,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
     item_pool = set(Item).union(set(Hm)).union(set(Badge))
     items_accessible = []
     prev_acc_checks = []
-    
+
     count = 0;
     cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.PASS in items_accessible
     cangetoutofSF = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.SSTICKET in items_accessible
@@ -774,7 +774,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
                     added_observations = True
                     if verbose:
                         print(f'observed {o_i.name} at check {o_c}')
-        if added_observations: 
+        if added_observations:
             pass;
             #continue;
 
@@ -793,7 +793,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
-            # get random blocking item that hasnt been placed yet 
+            # get random blocking item that hasnt been placed yet
             rand_block = random.choice(list(blocks))
             possible_items = get_items_from_rule(rand_block)
             rand_item = random.choice(list(possible_items))
@@ -807,7 +807,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
                     print(f'having trouble with {blocks} given these items: {items_accessible}')
                     pdb.set_trace()
 
-    
+
         # get random check that isnt filled already
         weighted_checks = [*list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
         while True:
@@ -840,7 +840,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             item_pool.remove(rand_item)
             if verbose:
                 print(f'putting {rand_item.name} at check {rand_check}')
-    
+
     count_trash = 0
     for ck in [ck for l in locations for ck in l.checks]:
         if ck.item_count > len(ck.item):

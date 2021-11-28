@@ -56,7 +56,7 @@ class Game:
         self.time = 0;
         return
 
-    # get possible checks for the player that have not been visited 
+    # get possible checks for the player that have not been visited
     def get_accessible_checks(self):
         items = self.player.key_items
         return randomizer.accessible_checks(self.locations,items,is_player=True)[0]
@@ -93,7 +93,7 @@ class Game:
                 if 'Pewter City' in locs:
                     locs.remove('Pewter City')
         return locs
-    # attempt a check, returns the item and cost 
+    # attempt a check, returns the item and cost
     # item is None if check is failed or check is not valid (check_logic has to be True)
     def attempt_check(self,check,check_logic=False):
         if check_logic:
@@ -118,7 +118,7 @@ class Game:
             self.player.go_to_location(location)
             self.time += 2
             return (location,2);
-        
+
         if location in self.graph.neighbors(self.player.location):
             steps = self.graph.edges[self.player.location,location]['steps']
             cost = steps/self.player.speed()
@@ -168,10 +168,10 @@ class Game:
                 colors[l.name] = 'orange'
             else:
                 colors[l.name] = 'blue'
-        
+
         IG = netgraph.InteractiveGraph(self.graph, node_labels=True, node_label_fontdict=dict(size=10,fontweight='bold'),
-                                    node_layout=coords, 
-                                    node_size=5000, node_label_offset=100, edge_width=1000, 
+                                    node_layout=coords,
+                                    node_size=5000, node_label_offset=100, edge_width=1000,
                                     node_shape = 'o', node_edge_color=colors, node_edge_width=1000,
                                     annotations=annotations, annotation_fontdict = dict(fontsize=8))
         plt.show()
@@ -199,6 +199,30 @@ def create_from_observations(observations,count=1,verbose=False):
         if count==1: return rando
         randos.append(rando)
     return randos
+
+def copy_with_observations(currGame, observations, count=1, verbose=False):
+    randos = create_from_observations(observations, count=count, verbose=verbose)
+    for rando in randos:
+        copy_game_state(rando, currGame)
+    return randos
+
+def copy_game_state(newGame, oldGame):]
+        newGame.time = oldGame.time
+
+        newGame.player.level = oldGame.player.level;
+        newGame.player.exp = oldGame.player.exp;
+        newGame.player.location = oldGame.player.location;
+        newGame.player.key_items = oldGame.player.key_items;
+        newGame.player.completed_checks = oldGame.player.completed_checks ;
+        newGame.player.visited_locations = oldGame.player.visited_locations;
+
+        for l in oldGame.graph.nodes:
+            newGame.graph[l]['location'].visited = oldGame.graph[l]['location'].visited;
+            newGame.graph[l]['location'].battles = oldGame.graph[l]['location'].battles;
+
+            for chk in oldGame.graph[l]['location'].checks:
+                newGame.graph[l]['location'].checks[chk].revealed = chk.revealed
+
 
 def is_item(item):
     if isinstance(item,Item) or \

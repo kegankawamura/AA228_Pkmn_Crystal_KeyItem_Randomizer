@@ -12,7 +12,7 @@ if __name__=='__main__':
 
     rando = game.create()
     observations = [];
-    
+
     while not rando.is_finished():
         while True:
             action_num = 1;
@@ -52,7 +52,7 @@ if __name__=='__main__':
                 rando_record.plot()
             if choice >0 and choice <=len(actions): break
         results,cost = rando.attempt_action(actions[choice-1])
-        
+
         if game.is_location(results):
             print(f'Moved to {results}')
         elif results == None:
