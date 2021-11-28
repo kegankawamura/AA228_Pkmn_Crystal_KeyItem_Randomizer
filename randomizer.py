@@ -101,6 +101,12 @@ class Location:
         self.battles = [];
         self.steps_to = {};
         self.fly_point = False;
+    # returns approximate probability of successfully moving to this location
+    def prob_success(self,player):
+        prob = 1
+        for battle in self.battles:
+            prob *= battle.prob_success(player)
+        return prob;
     def attempt(self,player):
         cost = self.cost(player);
         if(len(self.battles)):
@@ -121,21 +127,20 @@ class Location:
     def __str__(self):
         return self.name ;
     def __repr__(self): return 'l: '+self.__str__()
+    def __deepcopy__(self,memodict={}):
+        new = Location()
+        new.name = self.name;
+        new.checks = copy.deepcopy(self.checks)
+        new.rules = self.rules;
+        new.coord = self.coord;
+        new.visited = self.visited;
+        new.battles = copy.deepcopy(self.battles);
+        new.steps_to = self.steps_to;
+        new.fly_point = self.fly_point;
+        return new
     # equality across different games, lazy but should work
     def __eq__(self,other):
         return self.name == other.name;
-
-class Route:
-    # path from Location to location
-    def __init__(self):
-        self.number = 0;
-        self.endpoints = [];
-        self.cost = [];
-        self.battles = [];
-    def __str__(self):
-        return str(self.number) + ' between '+ self.endpoints[0] + ' and '+self.endpoints[1];
-    def __repr__(self):
-        return 'r: ' + self.__str__();
 
 class Check:
     def __init__(self):
@@ -147,6 +152,13 @@ class Check:
         self.item_count = 0;
         self.item = [];
         self.revealed = False;
+    # returns the approximate probability of success
+    def prob_success(self,player):
+        prob = 1
+        for battle in self.battles:
+            if battle.beat: continue;
+            prob *= battle.prob_success(player)
+        return prob;
     # returns item (None if fail) and time cost
     def attempt(self,player):
         cost = self.cost(player);
@@ -175,6 +187,17 @@ class Check:
         return self.action;
     def __repr__(self):
         return 'ck: ' + self.__str__();
+    def __deepcopy__(self,memodict={}):
+        new = Check();
+        new.action = self.action;
+        new.location = self.location;
+        new.rules = self.rules;
+        new.steps = self.steps;
+        new.battles = copy.deepcopy(self.battles);
+        new.item_count = self.item_count;
+        new.item = list(self.item);
+        new.revealed = self.revealed;
+        return new
 
 class Battle:
     def __init__(self):
@@ -182,13 +205,24 @@ class Battle:
         self.pokemon = [];
         self.beat = False;
 
-    # using B/W exp curve
+    # using B/W exp curve , with some cheating
     def calculate_exp(self,player_level):
         a=1.5 # trainer constant
         b=137 # median base experience yield
         return numpy.sum([ a*b*poke/5 *
-            ( (2*poke+10)/(poke+player_level+10) )**2.5 +1
+            ( (4*poke-5)/(poke+player_level-5) )**2.5 +1
                 for poke in self.pokemon])
+        #return numpy.sum([ a*b*poke/5 *
+        #    ( (2*poke+10)/(poke+player_level+10) )**2.5 +1
+        #        for poke in self.pokemon])
+    # returns approximate probability of success
+    def prob_success(self,player):
+        prob = 1;
+        l = player.level;
+        for poke in self.pokemon:
+            prob_win = Battle.interp_prob_win(l,poke)
+            prob *= prob_win
+        return prob
     # returns true if player beats this battle, and gives the player experience
     # returns false if player loses
     def battle(self,player):
@@ -196,16 +230,11 @@ class Battle:
         l = player.level;
         for poke in self.pokemon:
             # these are just made up to be:
-            #   20% chance to win against 4 pokes, 40% lower level
+            #   20% chance to win against 4 pokes, 60% lower level
             #   80% '   ', match level
             #   95% '   ', 25% higher level
             # making it slightly easier to beat red
-            if poke > 75:
-                interp_levels = [.4*poke,.9*poke,1.15*poke]
-            else:
-                interp_levels = [.6*poke,poke,1.25*poke]
-            interp_prob_win = [.67,.95,.98]
-            prob_win = numpy.interp(l,interp_levels,interp_prob_win)
+            prob_win = Battle.interp_prob_win(l,poke)
             if numpy.random.random_sample()>prob_win:
                 # lose against poke
                 return False;
@@ -215,6 +244,11 @@ class Battle:
     # cost is assumed to be 30 sec per pokemon
     def cost(self):
         return 30*len(self.pokemon)
+    def __deepcopy__(self,memodict={}):
+        new = Battle()
+        new.pokemon = self.pokemon
+        new.beat = self.beat
+        return new
 
 
 
@@ -229,6 +263,14 @@ class Battle:
             battle.pokemon = b;
             battles.append(battle)
         return battles
+    def interp_prob_win(player_level,poke):
+        if poke > 75:
+            interp_levels = [.3*poke,.9*poke,1.15*poke,1.2*poke]
+        else:
+            interp_levels = [.4*poke,poke,1.25*poke,1.3*poke]
+        interp_prob_win = [.8,.95,.98,.999]
+        prob_win = numpy.interp(player_level,interp_levels,interp_prob_win)
+        return prob_win
 
 def convert_rule(jrule):
     rule_list = [];
@@ -455,7 +497,8 @@ def accessible_checks(locations, helditems,is_player=False):
     for loc in locations:
         if is_reachable(loc,logic):
             for chk in loc.checks:
-                if is_reachable(chk,logic) and not chk.revealed:
+                if is_reachable(chk,logic) \
+                        and not (is_player and chk.revealed):
                     acc_checks.append(chk)
                 else:
                     blocks = get_missing_rules(chk,logic)
@@ -770,7 +813,7 @@ def randomize_remaining(locations,obs_orig,verbose=False):
                     items_accessible.append(o_i)
                     item_pool.remove(o_i)
                     count += 1
-                    #observations.remove((o_c,o_i))
+
                     added_observations = True
                     if verbose:
                         print(f'observed {o_i.name} at check {o_c}')
@@ -783,13 +826,13 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             rand_item = Item.BICYCLE
         elif count>=8 and Hm.FLY not in items_accessible: # make fly within early-mid checks
             rand_item = Hm.FLY
-        elif count>=12 and Badge.STORM not in items_accessible:
-            rand_item = Badge.STORM
         elif  count >= 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.PASS])
+        elif count>=12 and Badge.STORM not in items_accessible:
+            rand_item = Badge.STORM
         elif count >= 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
             rand_item = random.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
-        elif count > 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
+        elif count >= 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
@@ -800,7 +843,8 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             try_count = 0;
             while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
                 rand_block = random.choice(list(blocks))
-                possible_items = get_items_from_rule(rand_block)
+                possible_items = get_items_from_rule(rand_block).intersection(item_pool)
+                if len(possible_items)==0: continue
                 rand_item = random.choice(list(possible_items))
                 try_count+=1
                 if try_count >=200:
@@ -816,6 +860,9 @@ def randomize_remaining(locations,obs_orig,verbose=False):
             if len(rand_check.item)<rand_check.item_count and ( len(observations)==0 or rand_check not in list(zip(*observations))[0] ) :
                 break;
             try_count+=1
+            if try_count ==150:
+                acc_checks, blocks = accessible_checks(locations,items_accessible)
+                weighted_checks = acc_checks
             if try_count >=200:
                 print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
                 pdb.set_trace()
