@@ -114,7 +114,7 @@ class Location:
                 if battle.beat: continue;
                 # if fail battle
                 if not battle.battle(player):
-                    return (False,cost)
+                    return (False,cost+25)
         return (True,cost)
 
     def cost(self,player):
@@ -167,7 +167,7 @@ class Check:
                 if battle.beat: continue;
                 # if fail battle
                 if not battle.battle(player):
-                    return (None,cost)
+                    return (None,cost+25)
         # success
         self.revealed = True;
         for item in self.item:
@@ -248,9 +248,6 @@ class Battle:
         new.pokemon = self.pokemon
         new.beat = self.beat
         return new
-
-
-
     def __str__(self):
         return str(self.pokemon);
     def __repr__(self):
@@ -270,6 +267,13 @@ class Battle:
         interp_prob_win = [.8,.95,.98,.999]
         prob_win = numpy.interp(player_level,interp_levels,interp_prob_win)
         return prob_win
+
+#class WildBattle(Battle):
+#    def calculate_exp(self,player_level):
+#        return .75*super().calculate_exp(player_level)
+#    def prob_success(self,player):
+
+
 
 def convert_rule(jrule):
     rule_list = [];
@@ -390,7 +394,7 @@ def logical_rules(helditems):
     num_badges =  sum(isinstance(x,Badge) for x in helditems)
     if num_badges >=7:
         rules.append(Rule.CANFIGHTTEAMROCKET)
-    if num_badges >=16:
+    if num_badges >=14:
         rules.append(Rule.HAVEALLBADGES)
     if num_badges >=8:
         rules.append(Rule.HAVEEIGHTBADGES)
@@ -788,6 +792,10 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
     if rng==None:
         rng = numpy.random.default_rng()
 
+    if len(obs_orig)>0:
+        num_trash = sum([isinstance(x,Trash) for x in list(zip(*obs_orig))[1]])
+    else:
+        num_trash = 0
     observations = copy.copy(obs_orig)
     item_pool = set(Item).union(set(Hm)).union(set(Badge))
     items_accessible = []
@@ -834,18 +842,18 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
             added_observations,num_obs = process_observations()
             count += num_obs
 
-        if count>=0 and Item.BICYCLE not in items_accessible : # first item is bicycle to ensure early bike
+        if count>=0-num_trash and Item.BICYCLE not in items_accessible : # first item is bicycle to ensure early bike
             prev_acc_checks = acc_checks
             rand_item = Item.BICYCLE
-        elif count>=8 and Hm.FLY not in items_accessible and (len(observations)>0 and Hm.FLY not in list(zip(*observations))[1]): # make fly within early-mid checks
+        elif count>=8-num_trash and Hm.FLY not in items_accessible and (len(observations)>0 and Hm.FLY not in list(zip(*observations))[1]): # make fly within early-mid checks
             rand_item = Hm.FLY
-        elif  count >= 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
+        elif  count >= 9-num_trash and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
             rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.PASS])
-        elif count >= 12 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
+        elif count >= 12-num_trash and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
             rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
-        elif count>=13 and Badge.STORM not in items_accessible and (len(observations)>0 and Badge.STORM not in list(zip(*observations))[1]):
+        elif count>=13-num_trash and Badge.STORM not in items_accessible and (len(observations)>0 and Badge.STORM not in list(zip(*observations))[1]):
             rand_item = Badge.STORM
-        elif count >= 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
+        elif count >= 15-num_trash and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
@@ -898,7 +906,7 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                     rand_block = rng.choice(list(blocks))
                     possible_items = get_items_from_rule(rand_block).intersection(item_pool)
                     try_count+=1
-                    if try_count == 250:
+                    if try_count == 250 or try_count == 260: # might need to restart twice
                         process_observations()
                         acc_checks, blocks = accessible_checks(locations,items_accessible)
                         if len(blocks)==0: 
