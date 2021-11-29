@@ -3,7 +3,7 @@ import numpy
 import game
 import randomizer
 from randomizer import Item,Badge,Hm,Rule,ImpTown
-from .rewards import chkToReward
+from .rewards_lookahead import chkToReward
 import copy
 # were gonna try something
 from multiprocessing import Pool
