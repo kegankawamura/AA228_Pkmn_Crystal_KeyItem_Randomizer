@@ -497,7 +497,7 @@ def accessible_checks(locations, helditems,is_player=False):
         if is_reachable(loc,logic):
             for chk in loc.checks:
                 if is_reachable(chk,logic) \
-                        and not (is_player and chk.revealed):
+                        and not chk.revealed:
                     acc_checks.append(chk)
                 else:
                     blocks = get_missing_rules(chk,logic)
@@ -717,12 +717,12 @@ def randomize(locations,rng=None,verbose=False):
             rand_item = Item.BICYCLE
         elif count==8 and Hm.FLY not in items_accessible: # make fly within early-mid checks
             rand_item = Hm.FLY
-        elif count==12 and Badge.STORM not in items_accessible:
-            rand_item = Badge.STORM
         elif  count == 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
             rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.PASS])
-        elif count == 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
+        elif count == 12 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
             rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
+        elif count==13 and Badge.STORM not in items_accessible:
+            rand_item = Badge.STORM
         elif count > 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
@@ -797,6 +797,28 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
     cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.PASS in items_accessible
     cangetoutofSF = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.SSTICKET in items_accessible
 
+    acc_checks, blocks = accessible_checks(locations,items_accessible)
+    
+    def process_observations():
+        count = 0
+        added_observations = False
+        for o_c,o_i in list(observations):
+            if o_c in acc_checks:
+                chk = next(c for c in acc_checks if c==o_c)
+                observations.remove((o_c,o_i))
+                #chk.revealed=True
+                if o_i in item_pool:
+                    chk.item.append(o_i)
+                    if o_i == Trash.TRASH: continue;
+                    items_accessible.append(o_i)
+                    item_pool.remove(o_i)
+                    count += 1
+                    added_observations = True
+                    if verbose:
+                        print(f'observed {o_i.name} at check {o_c}')
+        return added_observations,count
+
+
     blocked = True
     while len(item_pool)>0:
         try_count = 0;
@@ -806,37 +828,21 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
             if len(blocks)==0:
                 blocked = False;
                 break
-        added_observations = False
-        for o_c,o_i in list(observations):
-            if o_c in acc_checks:
-                chk = next(c for c in acc_checks if c==o_c)
-                observations.remove((o_c,o_i))
-                chk.revealed=True
-                if o_i in item_pool:
-                    chk.item.append(o_i)
-                    if o_i == Trash.TRASH: continue;
-                    items_accessible.append(o_i)
-                    item_pool.remove(o_i)
-                    count += 1
-
-                    added_observations = True
-                    if verbose:
-                        print(f'observed {o_i.name} at check {o_c}')
-        if added_observations:
-            pass;
-            #continue;
+        if len(observations)>0: 
+            added_observations,num_obs = process_observations()
+            count += num_obs
 
         if count>=0 and Item.BICYCLE not in items_accessible : # first item is bicycle to ensure early bike
             prev_acc_checks = acc_checks
             rand_item = Item.BICYCLE
-        elif count>=8 and Hm.FLY not in items_accessible: # make fly within early-mid checks
+        elif count>=8 and Hm.FLY not in items_accessible and (len(observations)>0 and Hm.FLY not in list(zip(*observations))[1]): # make fly within early-mid checks
             rand_item = Hm.FLY
         elif  count >= 9 and not cangetoutofGR(): # make sure SB / Pass are placed before leaving GR
             rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.PASS])
-        elif count>=12 and Badge.STORM not in items_accessible:
-            rand_item = Badge.STORM
-        elif count >= 13 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
+        elif count >= 12 and not cangetoutofSF(): # make sure SB / Ticket are placed before leaving SF
             rand_item = rng.choice([Item.SQUIRTBOTTLE,Item.SSTICKET])
+        elif count>=13 and Badge.STORM not in items_accessible and (len(observations)>0 and Badge.STORM not in list(zip(*observations))[1]):
+            rand_item = Badge.STORM
         elif count >= 15 and not get_items_from_rule(Rule.CANUSESURF).issubset(items_accessible):
             if Hm.SURF not in items_accessible: rand_item = Hm.SURF
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
@@ -849,14 +855,21 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
             while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
                 rand_block = rng.choice(list(blocks))
                 possible_items = get_items_from_rule(rand_block).intersection(item_pool)
-                if len(possible_items)==0: continue
-                rand_item = rng.choice(list(possible_items))
                 try_count+=1
+                if try_count >= 150:
+                    process_observations()
+                    acc_checks, blocks = accessible_checks(locations,items_accessible)
+                    if len(blocks)==0: 
+                        #print('not actually blocked \\facepalm')
+                        blocked = False; break;
                 if try_count >=200:
                     print(f'having trouble with {blocks} given these items: {items_accessible}')
-                    pdb.set_trace()
+                    import pdb; pdb.set_trace()
+                if len(possible_items)==0: continue
+                rand_item = rng.choice(list(possible_items))
+            if not blocked: break;
 
-
+        try_count = 0
         # get random check that isnt filled already
         weighted_checks = [*list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
         while True:
@@ -865,12 +878,40 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
             if len(rand_check.item)<rand_check.item_count and ( len(observations)==0 or rand_check not in list(zip(*observations))[0] ) :
                 break;
             try_count+=1
-            if try_count ==150:
+            if try_count >=150:
                 acc_checks, blocks = accessible_checks(locations,items_accessible)
                 weighted_checks = acc_checks
-            if try_count >=200:
+                if len(observations)>0: 
+                    added_observations,num_obs = process_observations()
+                    weighted_checks, blocks = accessible_checks(locations,items_accessible)
+                    acc_checks = weighted_checks
+                    # try something smart for once
+                    if len(observations)>0:
+                        weighted_checks = [chk for chk in weighted_checks if chk not in list(zip(*observations))[1] and len(chk.item)<chk.item_count]
+                    else:
+                        weighted_checks = [chk for chk in weighted_checks if len(chk.item)<chk.item_count]
+                    count += num_obs
+                # get random blocking item that hasnt been placed yet
+                while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
+                    rand_block = rng.choice(list(blocks))
+                    possible_items = get_items_from_rule(rand_block).intersection(item_pool)
+                    try_count+=1
+                    if try_count == 250:
+                        process_observations()
+                        acc_checks, blocks = accessible_checks(locations,items_accessible)
+                        if len(blocks)==0: 
+                            #print('not actually blocked \\facepalm')
+                            blocked = False; break;
+                    if try_count >=300:
+                        print(f'having trouble with {blocks} given these items: {items_accessible}')
+                        import pdb; pdb.set_trace()
+                    if len(possible_items)==0: continue
+                    rand_item = rng.choice(list(possible_items))
+
+                #print('not actually  something dumb?')
+            if try_count >=500:
                 print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
-                pdb.set_trace()
+                import pdb; pdb.set_trace()
         # place item in check, and update sets of items
         rand_check.item.append(rand_item)
         items_accessible.append(rand_item)
@@ -898,6 +939,13 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
         if ck.item_count > len(ck.item):
             ck.item.extend([rng.choice(list(Trash)) for i in range(ck.item_count-len(ck.item))])
             count_trash +=1
+
+    if len(obs_orig):
+        for loc in locations :
+            for chk in loc.checks:
+                if chk in list(zip(*obs_orig))[0]:
+                    chk.revealed=True
+
     return locations
 
 if __name__=='__main__':
