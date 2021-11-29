@@ -11,10 +11,14 @@ class Agent:
         self.decisionmaker = alg(true_game)
     def policy(self):
         return self.decisionmaker.decide_action()
+    def observe(self,action,item):
+        self.decisionmaker.\
+                observations.append( (action,item) )
 
 class DecisionMaker(ABC):
     def __init__(self,true_game):
         self.game = true_game
+        self.observations = []
     
     @property
     @abstractmethod
