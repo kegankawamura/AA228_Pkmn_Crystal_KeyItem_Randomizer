@@ -3,6 +3,7 @@ import networkx
 import netgraph
 import matplotlib.pyplot as plt
 import copy
+import multiprocessing
 from multiprocessing import Pool
 from itertools import repeat
 
@@ -330,7 +331,7 @@ def create(count=1,seed=None,verbose=False,multiprocess=True):
 
     locs = randomizer.read_json()
     if multiprocess and count>1:
-        pool = Pool(4)
+        pool = Pool(multiprocessing.cpu_count())
         loc_copies = [copy.deepcopy(locs) for i in range(count)]
         stmap_iter = zip(loc_copies,rngs,repeat(verbose))
         rand_locs = pool.starmap(randomizer.randomize,stmap_iter)
@@ -366,7 +367,7 @@ def create_from_observations(observations,player,count=1,seed=None,verbose=False
 
     locs = randomizer.read_json()
     if multiprocess and count>1:
-        pool = Pool(4)
+        pool = Pool(multiprocessing.cpu_count())
         loc_copies = [copy.deepcopy(locs) for i in range(count)]
         stmap_iter = zip(loc_copies,repeat(observations),rngs,repeat(verbose))
         rand_locs = pool.starmap(randomizer.randomize_remaining,stmap_iter)
