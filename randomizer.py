@@ -807,6 +807,8 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                 chk = next(c for c in acc_checks if c==o_c)
                 observations.remove((o_c,o_i))
                 #chk.revealed=True
+                if o_i == Trash.TRASH:
+                    chk.item.append(o_i)
                 if o_i in item_pool:
                     chk.item.append(o_i)
                     if o_i == Trash.TRASH: continue;
