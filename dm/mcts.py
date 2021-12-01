@@ -2,14 +2,47 @@ import networkx as nx
 import random
 import numpy as np
 import randomizer
-from ../randomizer import Item, Trash, Badge, Hm
-import ../game as gm
-import rewards as rw
+from randomizer import Item, Trash, Badge, Hm, Rule
+import game as gm
+import dm.rewards as rw
 from copy import deepcopy
 
+itemIdx = dict()
+i = 1
+for item in Item:
+    itemIdx[item] = i
+    i += 1
+
+i = 1
+for trash in Trash:
+    itemIdx[trash] = i
+    i += 1
+
+i = 1
+for badge in Badge:
+    itemIdx[badge] = i
+    i += 1
+
+i = 1
+for hm in Hm:
+    itemIdx[hm] = i
+    i += 1
+
+i = 1
+for rule in Rule:
+    itemIdx[rule] = i
+    i += 1
+
+
 def state(game):
-    state = game.player.level
-    state += len(game.locations) * 100
+    state = game.player.level-1
+    i = 0
+    for l in game.locations:
+        if l.name == game.player.location:
+            break
+        i += 1
+
+    state += i * 100
     # need 17 bits to cover above number 2^17-1 = 131,071
     # up to 130 locations allowed
 
@@ -23,27 +56,27 @@ def state(game):
     l_trash = len(Trash) # 1
     l_badge = len(Badge) # 16
     l_hm = len(Hm) # 7
+    l_rule = len(Rule) # 24
 
     # assume that elements range from 1:length(Enum)
     for item in game.player.key_items:
-        if isinstance(item, Item) and not item_error_message(item, l_item):
-            item_s += 2**(item.value-1)
-        elif isinstance(item, Trash) and not item_error_message(item, l_trash):
-            item_s += 2**(item.value - 1 + l_item)
-        elif isinstance(item, Badge) and not item_error_message(item, l_badge):
-            item_s += 2**(item.value - 1 + l_item + l_trash)
-        elif isinstance(item, Hm) and not item_error_message(item, l_hm):
-            item_s += 2**(item.value - 1 + l_item + l_trash + l_badge)
+        if isinstance(item, Item) and not item_error_message(itemIdx[item], l_item):
+            item_s += 2**(itemIdx[item] - 1)
+        elif isinstance(item, Badge) and not item_error_message(itemIdx[item], l_badge):
+            item_s += 2**(itemIdx[item] - 1 + l_item)
+        elif isinstance(item, Hm) and not item_error_message(itemIdx[item], l_hm):
+            item_s += 2**(itemIdx[item] - 1 + l_item + l_badge)
+        elif isinstance(item, Rule) and not item_error_message(itemIdx[item], l_rule):
+            item_s += 2**(itemIdx[item] - 1 + l_item + l_badge + l_hm)
 
-    item_s *= 2**17
-
-    # total should be covered by 54 bits
+    # item_s should be covered by 60 bits
     # TODO: consider returning a tuple instead of one large number of type int64
-    return state + item_s
+    return (state, item_s)
 
 
 def item_error_message(elementEnum, lenEnum):
-    if elementEnum.value > lenEnum or item.value < 1:
+
+    if elementEnum > lenEnum or elementEnum < 1:
         print(f"Redefine enumeration for {elementEnum}")
         return True
     return False
@@ -76,7 +109,11 @@ class MCTS:
         else:
             self.rolloutPolicy = MCTS.randomStep
 
-        self._particles = game.create_from_observations(self._observations,count=numParticles)
+        self._particles = \
+            gm.create_from_observations( \
+                self._observations, \
+                crystalGame.player, \
+                count=numParticles)
 
 
     '''
@@ -86,13 +123,14 @@ class MCTS:
     '''
     def chooseAction(self, actions, m = 5):
 
+        s = state(self._game)
         for p in self._particles:
-            copy_game_state(p, self._game)
+            gm.copy_game_state(p, self._game)
             for k in range(m):
-                virtualGame = copy.deepcopy(self._game)
-                self.simulate(virtualGame, actions)
+                virtualGame = deepcopy(self._game)
+                self.simulate(virtualGame, actions, d = 10)
 
-        return np.argmax([Q[(s,a)] for a in actions])
+        return np.argmax([self._Q[(s,a)] for a in actions])
 
 
     '''
@@ -101,11 +139,14 @@ class MCTS:
         numParticles: number of "particles", or different game states,
                         to generate from the updated generative model
     '''
-    def addObservation(self, o, numParticles=len(self._particles)):
+    def addObservation(self, o, numParticles=0):
+        if numParticles == 0:
+            numParticles = len(self._particles)
         self._observations.append(o)
-        self._particles = game.create_from_observations(self._observations,count=numParticles)
-        for p in self._particles:
-            game.copy_game_state(p, self._game)
+        self._particles = \
+            gm.copy_with_observations( \
+                self._game, self._observations, count=numParticles)
+
 
     @staticmethod
     def randomStep(vgame, actions):
@@ -129,18 +170,24 @@ class MCTS:
         return ret
 
 
-    def UCB1_bonus(Nsa, Ns, c=1):
+    def UCB1_bonus(self, Nsa, Ns, c=1):
         if Nsa == 0:
             return np.inf
         else:
-            return c*sqrt(Ns/Nsa)
+            return c*np.sqrt(Ns/Nsa)
 
     '''
     Method for choosing the next action in MCTS. Employs UCB1 heuristic
     '''
     def explore(self, s, actions):
-        Ns = sum([N[(s,a)] for a in actions])
-        a_idx = np.argmax([Q[(s,a)+UCB1_bonus(N[(s,a)], Ns, c=10) for a in actions])
+        Ns = 0
+        for a in actions:
+            try:
+                Ns += self._N[(s,a)]
+            except KeyError:
+                self._N[(s,a)] = 0
+                self._Q[(s,a)] = 0.0
+        a_idx = np.argmax([self._Q[(s,a)] + self.UCB1_bonus(self._N[(s,a)], Ns, c=3000) for a in actions])
         return actions[a_idx]
 
     '''
@@ -149,19 +196,21 @@ class MCTS:
     def simulate(self, vgame, actions, d = 5):
 
         s = state(vgame)
-
         if d <= 0:
             if s not in self._U:
-                self._U(s) = rollout(vgame, actions,  8)
-            return self._U(s)
+                self._U[s] = self.rollout(vgame, actions,  8)
+            return self._U[s]
 
 
-        if (s,actions[0]) not in N:
+        if (s,actions[0]) not in self._N:
             for a in actions:
-                N[(s,a)] = 0
-                Q[(s,a)] = 0.0
+                self._N[(s,a)] = 0
+                self._Q[(s,a)] = 0.0
+                print(f'Adding {(s,a)}')
+            self._U[s] = self.rollout(vgame, actions,  8)
+            return self._U[s]
 
-        a = explore(s, actions)
+        a = self.explore(s, actions)
 
         results,cost = vgame.attempt_action(a)
 
@@ -175,6 +224,6 @@ class MCTS:
         actions += vgame.get_neighboring_locations()
 
         q = r + self._gamma*self.simulate(vgame, actions, d-1)
-        N[(s,a)] += 1
-        Q[(s,a)] += (q - Q[(s,a)])/N[(s,a)]
+        self._N[(s,a)] += 1
+        self._Q[(s,a)] += (q - self._Q[(s,a)])/self._N[(s,a)]
         return q

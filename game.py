@@ -288,10 +288,12 @@ def create(count=1,seed=None,verbose=False):
 
     randos = []
     locs = randomizer.read_json()
+    #print(locs)
     for i in range(count):
         locations = copy.deepcopy(locs)
         randomizer.randomize(locations,rng,verbose)
         rando = Game(locations)
+        #print(rando.graph.nodes.data())
         if count==1: return rando
         randos.append(rando)
     return randos
@@ -318,7 +320,7 @@ def create_from_observations(observations,player,count=1,seed=None,verbose=False
     return randos
 
 def copy_with_observations(currGame, observations, count=1, verbose=False):
-    randos = create_from_observations(observations, count=count, verbose=verbose)
+    randos = create_from_observations(observations, currGame.player, count=count, verbose=verbose)
     for rando in randos:
         copy_game_state(rando, currGame)
     return randos
@@ -329,16 +331,17 @@ def copy_game_state(newGame, oldGame):
         newGame.player.level = oldGame.player.level;
         newGame.player.exp = oldGame.player.exp;
         newGame.player.location = oldGame.player.location;
-        newGame.player.key_items = oldGame.player.key_items;
-        newGame.player.completed_checks = oldGame.player.completed_checks ;
-        newGame.player.visited_locations = oldGame.player.visited_locations;
+        newGame.player.key_items = copy.deepcopy(oldGame.player.key_items);
+        newGame.player.completed_checks = copy.deepcopy(oldGame.player.completed_checks);
+        newGame.player.visited_locations = copy.deepcopy(oldGame.player.visited_locations);
 
         for l in oldGame.graph.nodes:
-            newGame.graph[l]['location'].visited = oldGame.graph[l]['location'].visited;
-            newGame.graph[l]['location'].battles = oldGame.graph[l]['location'].battles;
-
-            for chk in oldGame.graph[l]['location'].checks:
-                newGame.graph[l]['location'].checks[chk].revealed = chk.revealed
+            newGame.graph.nodes[l]['location'].visited = oldGame.graph.nodes[l]['location'].visited;
+            newGame.graph.nodes[l]['location'].battles = copy.deepcopy(oldGame.graph.nodes[l]['location'].battles);
+            numChks = len(oldGame.graph.nodes[l]['location'].checks)
+            for chk in range(numChks):
+                newGame.graph.nodes[l]['location'].checks[chk].revealed = \
+                oldGame.graph.nodes[l]['location'].checks[chk].revealed
 
 
 def is_item(item):
