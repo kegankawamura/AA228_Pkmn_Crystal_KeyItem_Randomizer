@@ -3,6 +3,9 @@ import networkx
 import netgraph
 import matplotlib.pyplot as plt
 import copy
+import multiprocessing
+from multiprocessing import Pool
+from itertools import repeat
 
 import randomizer
 from randomizer import Item,Hm,Badge,Rule
@@ -131,6 +134,31 @@ class Game:
             prob *= self.graph.nodes[loc]['location'].prob_success(self.player)
         prob *= self.find_check(check).prob_success(self.player)
         return prob
+    # get cost to perform action without actually doing it
+    def get_cost_action(self,action):
+        if is_location(action): location = action
+        else: location = action.location
+
+        cost = 0
+        self.conditional_graph()
+        logic = randomizer.logical_rules(self.player.key_items);
+        canflyto = lambda loc: Rule.CANUSEFLY in logic and loc in self.player.visited_locations
+        if self.player.location != location:
+            if canflyto(location):
+                cost += 2
+            else:
+                nodes = networkx.shortest_path(self.graph,self.player.location,location,weight='steps')
+                for edge in zip( nodes,nodes[1:] ):
+                    if canflyto(edge[1]):
+                        cost+= 2
+                    else:
+                        cost += self.graph.edges[edge]['steps']/self.player.speed()
+                    cost += self.graph.nodes[edge[1]]['location'].cost(self.player)
+
+        if not is_location(action):
+            cost += self.find_check(action).cost(self.player)
+        return cost
+
 
     # attempt to go to a location, return bool(successful) and cost
     # go to location is successful if location is a neighboring location or fly point and can fly, and logic is set
@@ -138,15 +166,16 @@ class Game:
         # update graph
         self.conditional_graph()
         logic = randomizer.logical_rules(self.player.key_items);
+        canflyto = lambda loc: Rule.CANUSEFLY in logic and loc in self.player.visited_locations
         if check_logic:
-            if Rule.CANUSEFLY in logic and location in self.player.visited_locations:
+            if canflyto(location):
                 # fly speed is considered to take 2 secs
                 self.player.go_to_location(location)
                 return (location,2);
             if location not in self.accessible_locations(): return (None,0);
             if location not in self.get_neighboring_locations(): return (None,0);
 
-        if Rule.CANUSEFLY in logic and location in self.player.visited_locations:
+        if canflyto(location):
             # fly speed is considered to take 2 secs
             self.player.go_to_location(location)
             self.time += 2
@@ -159,19 +188,22 @@ class Game:
             cost += cost_battle
             if not succeed:
                 return (None,cost)
-
             self.player.go_to_location(location)
             self.time += cost
             return(location,cost)
+
         nodes = networkx.shortest_path(self.graph,self.player.location,location,weight='steps')
         cost = 0;
         for edge in zip( nodes,nodes[1:] ):
-            cost += self.graph.edges[edge]['steps']/self.player.speed()
-            succeed,cost_battle = self.graph.nodes[edge[1]]['location'].attempt(self.player)
-            cost += cost_battle
-            if not succeed:
-                return (self.player.location,cost)
-            self.player.go_to_location(edge[1])
+            if canflyto(edge[1]):
+                cost+= 2
+            else:
+                cost += self.graph.edges[edge]['steps']/self.player.speed()
+                succeed,cost_battle = self.graph.nodes[edge[1]]['location'].attempt(self.player)
+                cost += cost_battle
+                if not succeed:
+                    return (self.player.location,cost)
+                self.player.go_to_location(edge[1])
         self.time += cost
         return (location,cost)
     def attempt_action(self,action,check_logic=False):
@@ -185,9 +217,13 @@ class Game:
     def conditional_graph(self):
         graph = self.graph;
         if Rule.SNORLAX not in self.player.key_items:
-            self.graph.edges[('Vermilion City','Pewter City')]['steps']=9999999
+            #self.graph.edges[('Vermilion City','Pewter City')]['steps']=9999999
+            if self.graph.has_edge('Vermilion City','Pewter City'):
+                self.graph.remove_edge('Vermilion City','Pewter City')
         else:
-            self.graph.edges[('Vermilion City','Pewter City')]['steps']=100
+            if not self.graph.has_edge('Vermilion City','Pewter City'):
+                self.graph.add_edge('Vermilion City','Pewter City',steps=100)
+            #self.graph.edges[('Vermilion City','Pewter City')]['steps']=100
         if Item.SQUIRTBOTTLE not in self.player.key_items:
             self.graph.edges[('Ecruteak City','Goldenrod City')]['steps']=9999999
             self.graph.edges[('Ecruteak City','Violet City')]['steps']=9999999
@@ -278,29 +314,42 @@ class Game:
         new.player = copy.deepcopy(self.player)
         return new
 
-def create(count=1,seed=None,verbose=False):
+def create(count=1,seed=None,verbose=False,multiprocess=True):
     if seed==None:
         # not actually random enough, but should be fine
         seed = numpy.random.randint(2**63)
         if verbose:
             print(f'no seed given, using seed {seed}')
-    rng = numpy.random.default_rng(seed)
+    # attempt tp use pool
+    # tbh not much faster but makes me feel good
+    rngs = []
 
-    randos = []
-    locs = randomizer.read_json()
-    #print(locs)
     for i in range(count):
-        locations = copy.deepcopy(locs)
-        randomizer.randomize(locations,rng,verbose)
-        rando = Game(locations)
-        #print(rando.graph.nodes.data())
-        if count==1: return rando
-        randos.append(rando)
-    return randos
+        rng = numpy.random.default_rng(seed)
+        rngs.append(rng)
+        seed = rng.integers(2**63)
+
+    locs = randomizer.read_json()
+    if multiprocess and count>1:
+        pool = Pool(multiprocessing.cpu_count())
+        loc_copies = [copy.deepcopy(locs) for i in range(count)]
+        stmap_iter = zip(loc_copies,rngs,repeat(verbose))
+        rand_locs = pool.starmap(randomizer.randomize,stmap_iter)
+        randos = pool.map(Game,rand_locs)
+        return randos
+    else:
+        randos = []
+        for i in range(count):
+            locations = copy.deepcopy(locs)
+            randomizer.randomize(locations,rngs[i],verbose)
+            rando = Game(locations)
+            if count==1: return rando
+            randos.append(rando)
+        return randos
 
 # returns a possible game state that is consistent with a series of observations
 #   observations is a list of (check,item) tuples
-def create_from_observations(observations,player,count=1,seed=None,verbose=False):
+def create_from_observations(observations,player,count=1,seed=None,verbose=False,multiprocess=True):
     if seed==None:
         # not actually random enough, but should be fine
         seed = numpy.random.randint(2**63)
@@ -308,16 +357,34 @@ def create_from_observations(observations,player,count=1,seed=None,verbose=False
             print(f'no seed given, using seed {seed}')
     rng = numpy.random.default_rng(seed)
 
-    randos = []
-    locs = randomizer.read_json()
+    # tbh not much faster but makes me feel good
+    rngs = []
+
     for i in range(count):
-        locations = copy.deepcopy(locs)
-        randomizer.randomize_remaining(locations,observations,rng,verbose)
-        rando = Game(locations)
-        rando.player = copy.deepcopy(player)
-        if count==1: return rando
-        randos.append(rando)
-    return randos
+        rng = numpy.random.default_rng(seed)
+        rngs.append(rng)
+        seed = rng.integers(2**63)
+
+    locs = randomizer.read_json()
+    if multiprocess and count>1:
+        pool = Pool(multiprocessing.cpu_count())
+        loc_copies = [copy.deepcopy(locs) for i in range(count)]
+        stmap_iter = zip(loc_copies,repeat(observations),rngs,repeat(verbose))
+        rand_locs = pool.starmap(randomizer.randomize_remaining,stmap_iter)
+        randos = pool.map(Game,rand_locs)
+        for newgame in randos:
+            newgame.player = copy.deepcopy(player)
+        return randos
+    else:
+        randos = []
+        for i in range(count):
+            locations = copy.deepcopy(locs)
+            randomizer.randomize_remaining(locations,observations,rngs[i],verbose)
+            rando = Game(locations)
+            rando.player = copy.deepcopy(player)
+            if count==1: return rando
+            randos.append(rando)
+        return randos
 
 def copy_with_observations(currGame, observations, count=1, verbose=False):
     randos = create_from_observations(observations, currGame.player, count=count, verbose=verbose)
