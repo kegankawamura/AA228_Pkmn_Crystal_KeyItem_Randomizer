@@ -7,6 +7,8 @@ import game as gm
 import dm.rewards as rw
 from copy import deepcopy
 
+from dm.templates import DecisionMaker,ActionType
+
 itemIdx = dict()
 i = 1
 for item in Item:
@@ -84,8 +86,9 @@ def item_error_message(elementEnum, lenEnum):
 '''
 Monte Carlo Tree Search Class
 '''
-class MCTS:
+class MCTS(DecisionMaker):
 
+    action_type = ActionType.ACC_CHECKS
     '''
     Constructor Method
         crystalGame: instance of Game class agent is playing on
@@ -97,40 +100,78 @@ class MCTS:
         numParticles: number of "particles", or different game states,
                         to simulate on
     '''
-    def __init__(self, crystalGame, discount, rolloutPolicy=None,numParticles = 3):
-        self._game = crystalGame
-        self._Q = dict()
-        self._N = dict()
-        self._U = dict()
-        self._gamma = discount
-        self._observations = []
+    def __init__(self, crystalGame, \
+                    discount=1, \
+                    rolloutPolicy=None, \
+                    numParticles = 3, \
+                    numSim = 5):
+        DecisionMaker.__init__(self, crystalGame)
+        self.gamma = discount
         if rolloutPolicy:
             self.rolloutPolicy = rolloutPolicy
         else:
             self.rolloutPolicy = MCTS.randomStep
+        self._numParticles = numParticles
+        self.m = numSim
+
+        self._Q = dict()
+        self._N = dict()
+        self._U = dict()
+        self._numObs = 0
+
+        self.d_sim = 5
+        self.d_rollout = 5
 
         self._particles = \
             gm.create_from_observations( \
-                self._observations, \
+                self.observations, \
                 crystalGame.player, \
                 count=numParticles)
 
+
+    @property
+    def numParticles(self):
+        return self._numParticles
+
+    @numParticles.setter
+    def numParticles(self, n):
+        if n > 0:
+            self._numParticles = n
+            self._particles = \
+                gm.create_from_observations( \
+                self.observations, \
+                self.game.player, \
+                count=self._numParticles)
+
+
+
+    def setSimDepth(self, dd):
+        d_sim, d_rollout = dd
+        if d_sim > 0:
+            self.d_sim = d_sim
+        if d_rollout > 0:
+            self.d_rollout = d_rollout
 
     '''
     Given a set of actions, Monte Carlo Tree Search will choose the best action
         actions: set of possible actions
         m: the number of simulations per particle
     '''
-    def chooseAction(self, actions, m = 5):
-
-        s = state(self._game)
+    def decide_action(self):
+        if self._numObs < len(self.observations):
+            self._numObs = len(self.observations)
+            self.resampleParticles()
+        s = state(self.game)
+        actions = self.possible_actions()
+        i = 0
         for p in self._particles:
-            gm.copy_game_state(p, self._game)
-            for k in range(m):
-                virtualGame = deepcopy(self._game)
-                self.simulate(virtualGame, actions, d = 10)
+            gm.copy_game_state(p, self.game)
+            for k in range(self.m):
+                virtualGame = deepcopy(self.game)
+                self.simulate(virtualGame, i, actions, self.d_sim)
+            i += 1
 
-        return np.argmax([self._Q[(s,a)] for a in actions])
+        return actions[np.argmax([self._Q[(s,a)] for a in actions])]
 
 
     '''
@@ -139,13 +180,10 @@ class MCTS:
         numParticles: number of "particles", or different game states,
                         to generate from the updated generative model
     '''
-    def addObservation(self, o, numParticles=0):
-        if numParticles == 0:
-            numParticles = len(self._particles)
-        self._observations.append(o)
+    def resampleParticles(self):
         self._particles = \
             gm.copy_with_observations( \
-                self._game, self._observations, count=numParticles)
+                self.game, self.observations, count=self._numParticles)
 
 
     @staticmethod
@@ -166,7 +204,7 @@ class MCTS:
                 for item in results:
                     r += rw.chkToReward[item]
 
-            ret += self._gamma**t * r
+            ret += self.gamma**t * r
         return ret
 
 
@@ -185,21 +223,26 @@ class MCTS:
             try:
                 Ns += self._N[(s,a)]
             except KeyError:
+                print(f"Key Error during explore for {(s,a)}")
                 self._N[(s,a)] = 0
                 self._Q[(s,a)] = 0.0
-        a_idx = np.argmax([self._Q[(s,a)] + self.UCB1_bonus(self._N[(s,a)], Ns, c=3000) for a in actions])
+        a_idx = np.argmax([self._Q[(s,a)] + self.UCB1_bonus(self._N[(s,a)], Ns, c=400) for a in actions])
         return actions[a_idx]
 
     '''
     Simulation function for MCTS
     '''
-    def simulate(self, vgame, actions, d = 5):
+    def simulate(self, vgame, pNum, actions, d):
 
         s = state(vgame)
         if d <= 0:
             if s not in self._U:
-                self._U[s] = self.rollout(vgame, actions,  8)
-            return self._U[s]
+                self._U[s] = [self.rollout(vgame, actions, self.d_rollout), {pNum}]
+            elif pNum not in self._U[s][1]:
+                self._U[s][1].add(pNum)
+                U = self.rollout(vgame, actions,  self.d_rollout)
+                self._U[s][0] += 1/len(self._U[s][1]) * (U - self._U[s][0])
+            return self._U[s][0]
 
 
         if (s,actions[0]) not in self._N:
@@ -207,23 +250,21 @@ class MCTS:
                 self._N[(s,a)] = 0
                 self._Q[(s,a)] = 0.0
                 print(f'Adding {(s,a)}')
-            self._U[s] = self.rollout(vgame, actions,  8)
-            return self._U[s]
+            self._U[s] = [self.rollout(vgame, actions, self.d_rollout), {pNum}]
+            return self._U[s][0]
 
         a = self.explore(s, actions)
 
-        results,cost = vgame.attempt_action(a)
+        results,cost = vgame.attempt_accessible_check(a)
 
         r = -1*cost
         if isinstance(results, list) and gm.is_item(results[0]):
             for item in results:
                 r += rw.chkToReward[item]
 
-        actions = []
-        actions += vgame.get_checks_here()
-        actions += vgame.get_neighboring_locations()
+        actions = self.possible_actions()
 
-        q = r + self._gamma*self.simulate(vgame, actions, d-1)
+        q = r + self.gamma*self.simulate(vgame, pNum, actions, d-1)
         self._N[(s,a)] += 1
         self._Q[(s,a)] += (q - self._Q[(s,a)])/self._N[(s,a)]
         return q
