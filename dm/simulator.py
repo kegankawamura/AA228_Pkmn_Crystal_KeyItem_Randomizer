@@ -1,4 +1,5 @@
 from dm.templates import Agent, DecisionMaker, ActionType
+from copy import deepcopy
 import game
 from randomizer import Rule,Badge, Trash, Item, logical_rules
 import numpy
@@ -10,9 +11,18 @@ class Simulator:
         self.game = rando
         self.agent = Agent(rando,alg)
         self.recorder = Metrics()
+        self.history_action = []
+        self.history_level = []
+        self.history_turns = []
+        self.history_items = []
 
     def simulate_step(self):
         action = self.agent.policy()
+
+        self.history_action.append((self.game.player.location, action))
+        self.history_level.append(self.game.player.level)
+        self.history_turns.append(self.game.time)
+        self.history_items.append([item.name for item in self.game.player.key_items])
 
         print(f'attempting to do {action}!')
 
@@ -25,7 +35,7 @@ class Simulator:
                 for result in results:
                     print(f'obtained {result}')
                     self.agent.observe(action,result)
-            else: 
+            else:
                 print(f'!!failed to get check at level {self.game.player.level}!!')
         elif action_type==ActionType.CHECKS_LOCS:
             results,cost = self.game.attempt_action(action)
@@ -35,15 +45,37 @@ class Simulator:
                 for result in results:
                     print(f'obtained {result}')
                     self.agent.observe(action,result)
-            else: 
+            else:
                 print(f'!!failed to get check at level {self.game.player.level}!!')
+
         self.recorder.record_metrics(self.game)
     
-    def simulate(self):
+    def simulate(self, outputFile=None):
+        self.history_action = []
+        self.history_level = []
+        self.history_items = []
+        self.history_turns = []
+
         while not self.game.is_finished():
-            self.simulate_step()
-            print(f'game time: {self.game.time/60:.2f} min')
+            try:
+                self.simulate_step()
+                print(f'game time: {self.game.time/60:.2f} min')
+            except KeyboardInterrupt:
+                print('ending game early...')
+                break
+
         print(' completed game in '+convert_sec_to_str(self.game.time))
+        if outputFile:
+            with open(outputFile, 'w') as f:
+                print("writing to data file")
+                f.write(f'Total time: {self.game.time}\n')
+                f.write('Loc/Action, Level, Time, Items\n')
+                for i in range(len(self.history_turns)):
+                    f.write(f"{self.history_action[i]}, ")
+                    f.write(f"{self.history_level[i]}, ")
+                    f.write(f"{self.history_turns[i]}, ")
+                    f.write(f"{self.history_items[i]}\n")
+
 
     def simulate_plot(self):
         while not self.game.is_finished():
@@ -112,4 +144,3 @@ def convert_sec_to_str(sec):
     mins = int(mins%60)
     secs = sec-hrs*3600-mins*60
     return f'{hrs} h {mins} m {secs} s'
-
