@@ -385,7 +385,8 @@ def create_from_observations(observations,player,count=1,seed=None,verbose=False
         randos = []
         for i in range(count):
             locations = copy.deepcopy(locs)
-            randomizer.randomize_remaining(locations,observations,rngs[i],verbose)
+            # this is some real dumb
+            locations = randomizer.randomize_remaining(locations,observations,rngs[i],verbose)
             rando = Game(locations)
             rando.player = copy.deepcopy(player)
             if count==1: return rando

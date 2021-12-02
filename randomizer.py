@@ -789,6 +789,14 @@ def randomize(locations,rng=None,verbose=False):
 # returns a randomized set of locations such that the set of observations is consistent
 #   observations is a list of (check,item) tuples
 def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
+    def reset_locations():
+        for loc in locations:
+            for chk in loc.checks:
+                items = chk.item
+                for item in items:
+                    if item in items_accessible:
+                        chk.item.remove(item)
+
     if rng==None:
         rng = numpy.random.default_rng()
 
@@ -874,7 +882,10 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                         blocked = False; break;
                 if try_count >=200:
                     print(f'having trouble with {blocks} given these items: {items_accessible}')
-                    import pdb; pdb.set_trace()
+                    print('randomizer failed')
+                    #return None
+                    reset_locations()
+                    return randomize_remaining(locations,obs_orig,rng,verbose)
                 if len(possible_items)==0: continue
                 rand_item = rng.choice(list(possible_items))
             if not blocked: break;
@@ -914,14 +925,18 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                             blocked = False; break;
                     if try_count >=300:
                         print(f'having trouble with {blocks} given these items: {items_accessible}')
-                        import pdb; pdb.set_trace()
+                        print('restarting randomizer')
+                        reset_locations()
+                        return randomize_remaining(locations,obs_orig,rng,verbose)
                     if len(possible_items)==0: continue
                     rand_item = rng.choice(list(possible_items))
 
                 #print('not actually  something dumb?')
             if try_count >=500:
                 print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
-                import pdb; pdb.set_trace()
+                print('restarting randomizer')
+                reset_locations()
+                return randomize_remaining(locations,obs_orig,rng,verbose)
         # place item in check, and update sets of items
         rand_check.item.append(rand_item)
         items_accessible.append(rand_item)
