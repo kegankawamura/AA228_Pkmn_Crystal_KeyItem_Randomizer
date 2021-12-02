@@ -81,8 +81,8 @@ class Simulator:
         while not self.game.is_finished():
             self.simulate_step()
             self.game.plot()
-            print(f'game time: {self.game.time:.1f}')
-        print(f' completed game in {self.game.time:.2f}')
+            print(f'game time: {self.game.time/60:.2f}')
+        print(' completed game in '+convert_sec_to_str(self.game.time))
 
 # records time-series performance metrics of a game in metrics member
 #   times: timestamp of each
@@ -127,10 +127,11 @@ class Metrics:
             logic_rules = logical_rules(items)
             if Rule.CANUSEFLY in logic_rules: self.time_to_fly = time
 
-    def plot(self,metric,figure = None,prefix=''):
+    def plot(self,metric,figure = None,label=''):
         if metric not in self.metrics.keys():
             return -1
-        plt.plot(numpy.array(self.metrics['times'])/60,self.metrics[metric],label=prefix+metric,figure=figure)
+        plt.plot(numpy.array(self.metrics['times'])/60,self.metrics[metric],label=label,figure=figure)
+        plt.title(metric)
         plt.xlabel('time (min)')
         #plt.xlim(0,self.metrics['times'][-1]/60)
         plt.gca().yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(integer=True))
