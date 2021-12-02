@@ -225,11 +225,17 @@ class Game:
                 self.graph.add_edge('Vermilion City','Pewter City',steps=100)
             #self.graph.edges[('Vermilion City','Pewter City')]['steps']=100
         if Item.SQUIRTBOTTLE not in self.player.key_items:
-            self.graph.edges[('Ecruteak City','Goldenrod City')]['steps']=9999999
-            self.graph.edges[('Ecruteak City','Violet City')]['steps']=9999999
+            #self.graph.edges[('Ecruteak City','Goldenrod City')]['steps']=9999999
+            #self.graph.edges[('Ecruteak City','Violet City')]['steps']=9999999
+            if self.graph.has_edge('Ecruteak City','Goldenrod City'):
+                self.graph.remove_edge('Ecruteak City','Goldenrod City')
+                self.graph.remove_edge('Ecruteak City','Violet City')
         else:
-            self.graph.edges[('Ecruteak City','Goldenrod City')]['steps']=180
-            self.graph.edges[('Ecruteak City','Violet City')]['steps']=50
+            if not self.graph.has_edge('Ecruteak City','Goldenrod City'):
+                self.graph.add_edge('Ecruteak City','Goldenrod City',steps=180)
+                self.graph.add_edge('Ecruteak City','Violet City',steps=50)
+            #self.graph.edges[('Ecruteak City','Goldenrod City')]['steps']=180
+            #self.graph.edges[('Ecruteak City','Violet City')]['steps']=50
 
     def is_finished(self):
         return Rule.BEATRED in self.player.key_items;

@@ -7,15 +7,17 @@ from .rewards_lookahead import chkToReward
 import copy
 # were gonna try something
 from multiprocessing import Pool
+import itertools
 
 from dm.templates import DecisionMaker,ActionType
 import numpy
 from numpy.random import default_rng
 
 class BeliefSampling(DecisionMaker):
-    num_particles = 100
+    #num_particles = 200
+    num_particles = 75
     depth = 2
-    num_samples = 30
+    #depth = 1
     action_type = ActionType.ACC_CHECKS
 
     def decide_action(self):
@@ -26,13 +28,12 @@ class BeliefSampling(DecisionMaker):
         M = dict()
         # attempt to use pool
         pool = Pool(8)
-        particles = numpy.random.default_rng().choice(belief,self.num_samples)
-        smapiter = zip(particles,[self.depth]*self.num_particles)
+        smapiter = zip(belief,itertools.repeat(self.depth))
         ret_pool = pool.starmap(get_best_action,smapiter)
         actions = list(zip(*ret_pool))[0]
         rewards = list(zip(*ret_pool))[1]
 
-        for n in range(self.num_samples):
+        for n in range(self.num_particles):
             if actions[n]==None:
                 import pdb; pdb.set_trace()
             action = actions[n][0]
@@ -56,6 +57,8 @@ class BeliefSampling(DecisionMaker):
 #   resulting reward value
 #   future game state after optimal actions
 def get_best_action(game,depth):
+    # discount factor
+    gamma = .8
     #print('  ',end='')
     if depth == 0 or game.is_finished():
         #print('end')
@@ -67,7 +70,7 @@ def get_best_action(game,depth):
         cost /= game.prob_success(action)
         reward = get_reward(results,action,game,g) - cost
         future_action,future_reward,future_game = get_best_action(g,depth-1)
-        reward += future_reward
+        reward += gamma*future_reward
         if reward > best[1]:
             if future_action != None:
                 best = ([action]+[*future_action],reward,future_game)
@@ -102,5 +105,5 @@ def get_reward(results,action,game_prev,game_next):
         if result in chkToReward.keys():
             reward+= chkToReward[result]*prob_success
             if result==game.randomizer.Trash.TRASH:
-                reward += -500
+                reward += -100
     return reward

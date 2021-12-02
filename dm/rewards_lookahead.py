@@ -17,7 +17,7 @@ chkToReward[rdm.Item.RADIOCARD] = 5
 chkToReward[rdm.Item.EXPANSIONCARD] = 5
 chkToReward[rdm.Item.LOSTITEM] = 2.5
 
-chkToReward[rdm.Trash.TRASH] = -500
+chkToReward[rdm.Trash.TRASH] = -50
 
 chkToReward[rdm.Badge.ZEPHYR] = 5
 chkToReward[rdm.Badge.HIVE] = 5
@@ -49,8 +49,8 @@ chkToReward[rdm.Rule.SNORLAX] = 30
 chkToReward[rdm.Rule.ROCKETWELL] = 30
 chkToReward[rdm.Rule.FIXPOWERPLANT] = 30
 chkToReward[rdm.Rule.ELECTRODE] = 30
-chkToReward[rdm.Rule.OAK] = 100
+chkToReward[rdm.Rule.OAK] = 500
 chkToReward[rdm.Rule.HAVEALLBADGES] = 100
-chkToReward[rdm.Rule.BEATRED] = 100
+chkToReward[rdm.Rule.BEATRED] = 5000
 chkToReward[rdm.Rule.RETURNPOTION] = 30
 chkToReward[rdm.Rule.TALKJASMINE] = 30
