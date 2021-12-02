@@ -695,6 +695,15 @@ def read_json():
     #       fill in rest of items
 
 def randomize(locations,rng=None,verbose=False):
+
+    def reset_locations():
+        for loc in locations:
+            for chk in loc.checks:
+                items = chk.item
+                for item in items:
+                    if item in items_accessible:
+                        chk.item.remove(item)
+
     if rng==None:
         rng = numpy.random.default_rng()
 
@@ -705,6 +714,10 @@ def randomize(locations,rng=None,verbose=False):
     count = 0;
     cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.PASS in items_accessible
     cangetoutofSF = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.SSTICKET in items_accessible
+
+    # ok im unbelivably dumb
+    set_to_list  = lambda S : sorted(list(S),key=lambda i:i.name)
+    choice_set  = lambda S : rng.choice(set_to_list(S))
 
     blocked = True
     while len(item_pool)>0:
@@ -732,22 +745,28 @@ def randomize(locations,rng=None,verbose=False):
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
             # get random blocking item that hasnt been placed yet
-            rand_block = rng.choice(list(blocks))
+            #rand_block = rng.choice(list(blocks))
+            rand_block = choice_set(blocks)
             possible_items = get_items_from_rule(rand_block)
-            rand_item = rng.choice(list(possible_items))
+            #rand_item = rng.choice(list(possible_items))
+            rand_item = choice_set(possible_items)
             try_count = 0;
             while rand_item not in item_pool:
-                rand_block = rng.choice(list(blocks))
+                #rand_block = rng.choice(list(blocks))
+                rand_block = choice_set(blocks)
                 possible_items = get_items_from_rule(rand_block)
-                rand_item = rng.choice(list(possible_items))
+                #rand_item = rng.choice(list(possible_items))
+                rand_item = choice_set(possible_items)
                 try_count+=1
                 if try_count >=200:
                     print(f'having trouble with {blocks} given these items: {items_accessible}')
-                    pdb.set_trace()
+                    reset_locations()
+                    return randomize(locations,rng,verbose)
 
 
         # get random check that isnt filled already
-        weighted_checks = [*list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
+        #weighted_checks = [*set_to_list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
+        weighted_checks = [chk for chk in acc_checks if chk not in prev_acc_checks]+acc_checks
         while True:
             # make new checks twice as likely to be selected
             rand_check = rng.choice(weighted_checks)
@@ -756,7 +775,8 @@ def randomize(locations,rng=None,verbose=False):
             try_count+=1
             if try_count >=200:
                 print(f'having trouble with {blocks} given these items: {items_accessible} and these checks: {acc_checks}')
-                pdb.set_trace()
+                reset_locations()
+                return randomize(locations,rng,verbose)
         # place item in check, and update sets of items
         rand_check.item.append(rand_item)
         items_accessible.append(rand_item)
@@ -768,7 +788,9 @@ def randomize(locations,rng=None,verbose=False):
 
     if len(item_pool)>0:
         while len(item_pool)>0:
-            rand_item = rng.choice(list(item_pool))
+            acc_checks, _ = accessible_checks(locations,items_accessible)
+            #rand_item = rng.choice(list(item_pool))
+            rand_item = choice_set(item_pool)
             rand_check = rng.choice(acc_checks)
             while len(rand_check.item)>=rand_check.item_count:
                 rand_check = rng.choice(acc_checks)
@@ -812,6 +834,10 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
     count = 0;
     cangetoutofGR = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.PASS in items_accessible
     cangetoutofSF = lambda : Item.SQUIRTBOTTLE in items_accessible or Item.SSTICKET in items_accessible
+
+    # ok im unbelivably dumb
+    set_to_list  = lambda S : sorted(list(S),key=lambda i:i.name)
+    choice_set  = lambda S : rng.choice(set_to_list(S))
 
     acc_checks, blocks = accessible_checks(locations,items_accessible)
     
@@ -866,12 +892,12 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
             elif Badge.FOG not in items_accessible: rand_item = Badge.FOG
         else:
             # get random blocking item that hasnt been placed yet
-            rand_block = rng.choice(list(blocks))
+            rand_block = choice_set(blocks)
             possible_items = get_items_from_rule(rand_block)
-            rand_item = rng.choice(list(possible_items))
+            rand_item = choice_set(possible_items)
             try_count = 0;
             while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
-                rand_block = rng.choice(list(blocks))
+                rand_block = choice_set(blocks)
                 possible_items = get_items_from_rule(rand_block).intersection(item_pool)
                 try_count+=1
                 if try_count >= 150:
@@ -887,12 +913,12 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                     reset_locations()
                     return randomize_remaining(locations,obs_orig,rng,verbose)
                 if len(possible_items)==0: continue
-                rand_item = rng.choice(list(possible_items))
+                rand_item = choice_set(possible_items)
             if not blocked: break;
 
         try_count = 0
         # get random check that isnt filled already
-        weighted_checks = [*list(set(acc_checks)-set(prev_acc_checks)),*acc_checks]
+        weighted_checks = [chk for chk in acc_checks if chk not in prev_acc_checks]+acc_checks
         while True:
             # make new checks twice as likely to be selected
             rand_check = rng.choice(weighted_checks)
@@ -909,12 +935,17 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                     # try something smart for once
                     if len(observations)>0:
                         weighted_checks = [chk for chk in weighted_checks if chk not in list(zip(*observations))[1] and len(chk.item)<chk.item_count]
+                        if len(weighted_checks)==0:
+                            print('lol dont know how to even deal with this')
+                            print('restarting randomizer')
+                            reset_locations()
+                            return randomize_remaining(locations,obs_orig,rng,verbose)
                     else:
                         weighted_checks = [chk for chk in weighted_checks if len(chk.item)<chk.item_count]
                     count += num_obs
                 # get random blocking item that hasnt been placed yet
                 while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
-                    rand_block = rng.choice(list(blocks))
+                    rand_block = choice_set(blocks)
                     possible_items = get_items_from_rule(rand_block).intersection(item_pool)
                     try_count+=1
                     if try_count == 250 or try_count == 260: # might need to restart twice
@@ -929,7 +960,7 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                         reset_locations()
                         return randomize_remaining(locations,obs_orig,rng,verbose)
                     if len(possible_items)==0: continue
-                    rand_item = rng.choice(list(possible_items))
+                    rand_item = choice_set(possible_items)
 
                 #print('not actually  something dumb?')
             if try_count >=500:
@@ -948,7 +979,8 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
 
     if len(item_pool)>0:
         while len(item_pool)>0:
-            rand_item = rng.choice(list(item_pool))
+            acc_checks, _ = accessible_checks(locations,items_accessible)
+            rand_item = choice_set(item_pool)
             rand_check = rng.choice(acc_checks)
             while len(rand_check.item)>=rand_check.item_count:
                 rand_check = rng.choice(acc_checks)
