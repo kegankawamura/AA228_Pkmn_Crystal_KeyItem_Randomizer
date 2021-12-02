@@ -347,7 +347,7 @@ def create(count=1,seed=None,verbose=False,multiprocess=True):
         randos = []
         for i in range(count):
             locations = copy.deepcopy(locs)
-            randomizer.randomize(locations,rngs[i],verbose)
+            locations = randomizer.randomize(locations,rngs[i],verbose)
             rando = Game(locations)
             if count==1: return rando
             randos.append(rando)
