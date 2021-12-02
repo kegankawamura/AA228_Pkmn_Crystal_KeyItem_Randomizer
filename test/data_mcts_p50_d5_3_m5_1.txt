@@ -1,0 +1,49 @@
+Total time: 5727.125
+('New Bark Town', ck: Radio Card), 0
+('Azalea Town', ck: Radio Card), 0
+('Goldenrod Radio Tower', ck: Shops), 143.125
+('Goldenrod Underground', ck: Pokémon Center), 179.375
+('Route 32', ck: Gym - Whitney), 214.6875
+('Goldenrod City', ck: Gym - Falkner), 366.25
+('Violet City', ck: Pokedex), 557.8125
+('Route 30', ck: Gym - Whitney), 564.0625
+('Goldenrod City', ck: Buena), 673.125
+('Goldenrod Radio Tower', ck: Bike Shop), 676.875
+('Goldenrod City', ck: Pokegear), 681.875
+('New Bark Town', ck: Fisherman), 733.9375
+('Route 12', ck: Mr. Pokémon), 798.3125
+('Route 30', ck: Defeat The Elder), 855.8125
+('Sprout Tower', ck: Defeat Team Rocket), 1110.1875
+('Slowpoke Well', ck: Retrieve Farfetch'd), 1361.5
+('Ilex Forest', ck: Gym - Bugsy), 1366.625
+('Azalea Town', ck: Kimono Girls), 1552.375
+('Ecruteak City', ck: False Director), 1785.0625
+('Goldenrod Radio Tower', ck: Lighthouse - Return Secretpotion), 1973.3125
+('Olivine Lighthouse', ck: House), 2109.125
+('Ecruteak City', ck: Fisherman), 2111.75
+('Olivine City', ck: Flower Shop), 2114.375
+('Goldenrod City', ck: Cafe), 2120.125
+('Olivine City', ck: Lighthouse - Talk to Jasmine), 2122.75
+('Olivine Lighthouse', ck: Entrance), 2131.0
+('Ice Path', ck: Red Gyarados), 2154.6875
+('Lake of Rage', ck: Gym - Chuck), 2252.9375
+('Cianwood City', ck: Chuck's Wife), 2538.0
+('Cianwood City', ck: Gym - Erika), 2538.9375
+('Celadon City', ck: Pharmacy), 2877.125
+('Cianwood City', ck: Gym - Erika), 2879.75
+('Celadon City', ck: Gym - Blaine), 3186.125
+('Seafoam Islands', ck: Gym - Brock), 3326.8125
+('Pewter City', ck: Old Man), 3524.6875
+('Pewter City', ck: Defeat The Electrodes), 3526.25
+('Mahogany Town', ck: Gym - Pryce), 4213.25
+('Mahogany Town', ck: Gym - Sabrina), 4334.1875
+('Saffron City', ck: Copycat Girl), 4429.625
+('Saffron City', ck: Talk to Blue), 4431.8125
+('Cinnabar Island', ck: Talk To Manager), 4434.4375
+('Power Plant', ck: Rocket Member), 4467.0625
+('Cerulean City', ck: Pokémon League), 4470.9375
+('Indigo Plateau', ck: Defeat Elite Four), 5271.6875
+('New Bark Town', ck: Talk To Oak), 5275.5625
+('Pallet Town', ck: Red), 5278.1875
+('Mt. Silver', ck: Fix Power Plant), 5517.5
+('Power Plant', ck: Red), 5520.125

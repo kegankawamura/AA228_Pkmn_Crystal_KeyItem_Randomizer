@@ -75,6 +75,35 @@ def state(game):
     # TODO: consider returning a tuple instead of one large number of type int64
     return (state, item_s)
 
+def decodeState(game, state):
+    level = state[0] % 100 + 1
+    loc_idx = (state[0] - level + 1)/100
+    location = game.locations[loc_idx]
+    item_s = state[1]
+    items = []
+    i = 0
+    Item_list = list(Item)
+    Badge_list = list(Badge)
+    Hm_list = list(Hm)
+    Rule_list = list(Rule)
+
+    l_item = len(Item) # 13
+    l_badge = len(Badge) # 16
+    l_hm = len(Hm) # 7
+    l_rule = len(Rule) # 24
+    while item_s > 0:
+        if i < len_item and item_s % 2 == 1:
+            items.append(Item_list[i])
+        elif i < len_item+len_badge and item_s % 2 == 1:
+            items.append(Badge_list[i-l_item])
+        elif i < len_item+len_badge+l_hm and item_s % 2 == 1:
+            items.append(Hm_list[i-l_item-l_badge])
+        elif i < len_item+len_badge+l_hm+l_rule and item_s % 2 == 1:
+            items.append(Rule_list[i-l_item-l_badge-l_hm])
+
+        i += 1
+        item_s >>= 1
+    return level, location, items
 
 def item_error_message(elementEnum, lenEnum):
 
@@ -167,7 +196,7 @@ class MCTS(DecisionMaker):
         for p in self._particles:
             gm.copy_game_state(p, self.game)
             for k in range(self.m):
-                virtualGame = deepcopy(self.game)
+                virtualGame = deepcopy(p)
                 self.simulate(virtualGame, i, actions, self.d_sim)
             i += 1
 
@@ -249,7 +278,7 @@ class MCTS(DecisionMaker):
             for a in actions:
                 self._N[(s,a)] = 0
                 self._Q[(s,a)] = 0.0
-                print(f'Adding {(s,a)}')
+                #print(f'Adding {(s,a)}')
             self._U[s] = [self.rollout(vgame, actions, self.d_rollout), {pNum}]
             return self._U[s][0]
 

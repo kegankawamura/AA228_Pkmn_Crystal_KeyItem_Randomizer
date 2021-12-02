@@ -12,4 +12,4 @@ if __name__=="__main__":
     sim.agent.decisionmaker.setSimDepth = (5, 3)
     sim.agent.decisionmaker.m = 5
 
-    sim.simulate()
+    sim.simulate(outputFile='data_mcts_p50_d5_3_m5.txt')
