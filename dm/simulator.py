@@ -5,6 +5,7 @@ from randomizer import Rule,Badge, Trash, Item, logical_rules
 import numpy
 import matplotlib
 import matplotlib.pyplot as plt
+import time
 
 class Simulator:
     def __init__(self,rando,alg):
@@ -50,7 +51,7 @@ class Simulator:
 
         self.recorder.record_metrics(self.game)
     
-    def simulate(self, outputFile=None):
+    def simulate(self, outputFile=None,plot=False):
         self.history_action = []
         self.history_level = []
         self.history_items = []
@@ -75,14 +76,10 @@ class Simulator:
                     f.write(f"{self.history_level[i]}, ")
                     f.write(f"{self.history_turns[i]}, ")
                     f.write(f"{self.history_items[i]}\n")
-
-
-    def simulate_plot(self):
-        while not self.game.is_finished():
-            self.simulate_step()
+        if plot:
             self.game.plot()
-            print(f'game time: {self.game.time/60:.2f}')
-        print(' completed game in '+convert_sec_to_str(self.game.time))
+
+
 
 # records time-series performance metrics of a game in metrics member
 #   times: timestamp of each
@@ -103,29 +100,34 @@ class Metrics:
                 ('items'            ,[]),
                 ('badges'           ,[]),
                 ('trash'            ,[]),
+                ('comp_time'        ,[]),
                 ));
-
+        self.comp_time_start = time.time()
         self.completion_time = -1;
         self.time_to_bike = -1;
         self.time_to_fly = -1;
 
     def record_metrics(self,game):
         metrics = self.metrics; 
-        time = game.time
+        metrics['comp_time'].append(time.time()-self.comp_time_start)
+        self.comp_time_start = time.time()
+
+
+        game_time = game.time
         items = game.player.key_items
-        metrics['times'].append(time)
+        metrics['times'].append(game_time)
         metrics['available_checks'].append( len(game.get_accessible_checks() ))
         metrics['completed_checks'].append(len(game.player.completed_checks))
         metrics['level'].append(game.player.level)
         metrics['items'].append(len(items))
         metrics['badges'].append( sum(1 for i in items if isinstance(i,Badge)) )
         metrics['trash'].append( sum(1 for i in items if isinstance(i,Trash)) )
-        if game.is_finished(): self.completion_time = time
+        if game.is_finished(): self.completion_time = game_time
         if self.time_to_bike<0:
-            if Item.BICYCLE in items: self.time_to_bike = time
+            if Item.BICYCLE in items: self.time_to_bike = game_time
         if self.time_to_fly<0:
             logic_rules = logical_rules(items)
-            if Rule.CANUSEFLY in logic_rules: self.time_to_fly = time
+            if Rule.CANUSEFLY in logic_rules: self.time_to_fly = game_time
 
     def plot(self,metric,figure = None,label=''):
         if metric not in self.metrics.keys():
