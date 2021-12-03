@@ -394,7 +394,7 @@ def create_from_observations(observations,player,count=1,seed=None,verbose=False
         return randos
 
 def copy_with_observations(currGame, observations, count=1, verbose=False):
-    randos = create_from_observations(observations, currGame.player, count=count, verbose=verbose)
+    randos = create_from_observations(observations, currGame.player, count=count, verbose=verbose, multiprocess=True)
     for rando in randos:
         copy_game_state(rando, currGame)
     return randos

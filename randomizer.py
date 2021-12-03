@@ -840,7 +840,7 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
     choice_set  = lambda S : rng.choice(set_to_list(S))
 
     acc_checks, blocks = accessible_checks(locations,items_accessible)
-    
+
     def process_observations():
         count = 0
         added_observations = False
@@ -872,7 +872,7 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
             if len(blocks)==0:
                 blocked = False;
                 break
-        if len(observations)>0: 
+        if len(observations)>0:
             added_observations,num_obs = process_observations()
             count += num_obs
 
@@ -903,7 +903,7 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                 if try_count >= 150:
                     process_observations()
                     acc_checks, blocks = accessible_checks(locations,items_accessible)
-                    if len(blocks)==0: 
+                    if len(blocks)==0:
                         #print('not actually blocked \\facepalm')
                         blocked = False; break;
                 if try_count >=200:
@@ -928,7 +928,7 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
             if try_count >=150:
                 acc_checks, blocks = accessible_checks(locations,items_accessible)
                 weighted_checks = acc_checks
-                if len(observations)>0: 
+                if len(observations)>0:
                     added_observations,num_obs = process_observations()
                     weighted_checks, blocks = accessible_checks(locations,items_accessible)
                     acc_checks = weighted_checks
@@ -945,13 +945,16 @@ def randomize_remaining(locations,obs_orig,rng=None,verbose=False):
                     count += num_obs
                 # get random blocking item that hasnt been placed yet
                 while rand_item not in item_pool or ( len(observations) and rand_item in list(zip(*observations))[1] ) :
+                    if len(blocks)==0:
+                        #print('not actually blocked \\facepalm')
+                        blocked = False; break;
                     rand_block = choice_set(blocks)
                     possible_items = get_items_from_rule(rand_block).intersection(item_pool)
                     try_count+=1
                     if try_count == 250 or try_count == 260: # might need to restart twice
                         process_observations()
                         acc_checks, blocks = accessible_checks(locations,items_accessible)
-                        if len(blocks)==0: 
+                        if len(blocks)==0:
                             #print('not actually blocked \\facepalm')
                             blocked = False; break;
                     if try_count >=300:
