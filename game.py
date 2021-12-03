@@ -318,6 +318,7 @@ class Game:
             for (loc,steps) in l.steps_to.items():
                 new.graph.add_edge(l.name,loc,steps=steps)
         new.player = copy.deepcopy(self.player)
+        new.time = self.time
         return new
 
 def create(count=1,seed=None,verbose=False,multiprocess=True):
